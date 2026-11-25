@@ -17,10 +17,7 @@
 <summary>Лог загрузки ядра 6.18!</summary>
 ---Jump to address=80A00000
 
-
 reboot.......
-
-
 
 OpenWrt kernel loader for Realtek RTL819X
 
@@ -578,7 +575,8 @@ G b8010080: 00000000 00100401 00100401 00100401 00000401 01010101 00010101 01010
 20:59:39 (loader стартовал ядро)
 [   52.765807] rtl819x: router mode off (vlan 0) MACCR1=00000000 P0GMIICR=02037d57 PVCR0=00090009
 20:59:43 (loader стартовал ядро)
-```text
+```
+
 
 ```
 
