@@ -13,7 +13,8 @@
 | Коммутатор | RTL836RB (chip id: 0x6367-0020): 1 WAN + 2 LAN, гигабит |
 | Консоль | UART 38400 8N1 |
 
-```text
+<details>
+<summary>Лог загрузки вендорного ядра</summary>
 Booting...
 init_ram
 bond:0x0000000b
