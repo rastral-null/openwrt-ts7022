@@ -1,5 +1,7 @@
 # OpenWrt для Transerv 7022
 
+<img width="500" height="474" alt="image" src="https://github.com/user-attachments/assets/b9a595e1-5ef5-4620-af26-ce6fa264cae6" />
+
 ### Характеристики
 
 | | |
