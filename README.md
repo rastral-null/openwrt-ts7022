@@ -15,6 +15,7 @@
 
 <details>
 <summary>Лог загрузки ядра 6.18!</summary>
+
 ```text
 ---Jump to address=80A00000
 
