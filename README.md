@@ -15,6 +15,8 @@
 
 <details>
 <summary>Лог загрузки вендорного ядра</summary>
+
+```text
 Booting...
 init_ram
 bond:0x0000000b
@@ -211,7 +213,7 @@ start address: 0x80514c20
 [    2.640000]   SoC: 8197FS-VG
 [    6.320000] Switch API version: v1.3.11, chip id: 0x6367-0020
 [    8.120000] Start to initiate QM
-[    8.120000] INIT swCore descriptor count Failed : (0 [0])
+[    8.120000] INIT swCore descriptor count Failed : (0)
 [    8.180000] Netlink[Kernel] create socket for hw qos config ok.
 [    8.190000] Netlink[Kernel] create socket for hw 83xx qos config ok.
 [    8.230000] eth0 added. vid=9 Member port 0x2...
@@ -231,9 +233,7 @@ flash[919]: customer hw setting offset is 0x23000 flash erasesize=0x10000!!!
 flash[919]: current setting offset is 0x2c000 flash erasesize=0x10000!!!
 
 flash[919]: customer hw setting offset is 0x23000 flash erasesize=0x10000!!!
-
 flash[919]: current setting offset is 0x2c000 flash erasesize=0x10000!!!
-
 Please refine linux/.config change offset to fit flash erease size!!!!!!!!!!!!!!!!!
 [   10.210000] rtl83xx_setAsicReg: reg= 1b03, data= 200
 reinitd[924]: Event [init] boot=1
@@ -255,14 +255,14 @@ reinitd[942]:init: copyFile(): open source '/etc/group_orig' failed: No such fil
 [   11.200000] device wlan1-vxd entered promiscuous mode
 reinitd[942]:init: update_bridge_lan_intf(delif)
 [   11.240000] IPv6: ADDRCONF(NETDEV_UP): br0: link is not ready
-reinitd[942]:init: (2)"RTNETLINK answers: Cannot assign requested address" < ip -6 address add ::/0 dev br0 
+reinitd[942]:init: (2)"RTNETLINK answers: Cannot assign requested address" < ip -6 address add ::/0 dev br0
 [   11.610000] chip_version=0x100f,WlanSupportAbility = 0x2
-[   11.630000] PrepareRXBD88XX_V1 134 
-[   11.640000] test 0x875d2c00,0x30,0x75d2e80,0x0, 
-[   11.660000] test 0x875d2c80,0x30,0x75d2ec0,0x0, 
-[   11.670000] test 0x875d2d00,0x30,0x75d2f00,0x0, 
-[   11.690000] test 0x875d2d80,0x30,0x75d2f40,0x0, 
-[   11.700000] test 0x875d2e00,0x30,0x75d2f80,0x0, 
+[   11.630000] PrepareRXBD88XX_V1 134
+[   11.640000] test 0x875d2c00,0x30,0x75d2e80,0x0,
+[   11.660000] test 0x875d2c80,0x30,0x75d2ec0,0x0,
+[   11.670000] test 0x875d2d00,0x30,0x75d2f00,0x0,
+[   11.690000] test 0x875d2d80,0x30,0x75d2f40,0x0,
+[   11.700000] test 0x875d2e00,0x30,0x75d2f80,0x0,
 [   11.850000] [97F] RFE type 0 PHY paratemters: DEFAULT
 [   11.850000] clock 40MHz
 [   11.850000] AP-mode enabled...
@@ -275,8 +275,8 @@ reinitd[942]:init: (2)"RTNETLINK answers: Cannot assign requested address" < ip 
 [   12.050000] InitMACWMACHandler OK
 [   12.050000] InitMACSysyemCfgHandler OK
 [   12.050000] InitMACFunctionHandler OK
-[   12.120000] [GetHwReg88XX][PHY_REG_PG_8197Gmp_Type0] size = 0x872 *((pu4Byte)(val))=0 
-[   12.140000] [GetHwReg88XX][PHY_REG_PG_8197Gmp_Type0 start ] 8068b150 
+[   12.120000] [GetHwReg88XX][PHY_REG_PG_8197Gmp_Type0] size = 0x872 *((pu4Byte)(val))=0
+[   12.140000] [GetHwReg88XX][PHY_REG_PG_8197Gmp_Type0 start ] 8068b150
 [   12.470000] start_addr=(0x0), end_addr=(0x10000), buffer_size=(0x10000), smp_number_max=(8192)
 [   12.740000] chip_version=0x2001,WlanSupportAbility = 0x3
 [   12.900000] clock 40MHz
@@ -289,10 +289,10 @@ reinitd[942]:init: (2)"RTNETLINK answers: Cannot assign requested address" < ip 
 [   12.900000] [TRACE]8812F pwr seq ver = V01
 [   12.900000] [TRACE]mac_pwr_switch_pcie_8812f <===
 [   12.900000] InitPON OK!!!
-[   12.900000] REG_HCI_MIX_CFG = 2b 
+[   12.900000] REG_HCI_MIX_CFG = 2b
 [   12.900000] [TRACE]init_system_cfg_8812f ===>
 [   12.900000] [TRACE]init_system_cfg_8812f <===
-[   12.900000] InitMAC Page0 
+[   12.900000] InitMAC Page0
 [   12.900000] [TRACE]download_firmware_88xx ===>
 [   12.900000] [TRACE]halmac h2c ver = f, fw h2c ver = e!!
 [   12.900000] [TRACE]=== FW info ===
@@ -304,7 +304,7 @@ reinitd[942]:init: (2)"RTNETLINK answers: Cannot assign requested address" < ip 
 [   12.900000] [TRACE]0x80=0xC078, cnt=5000
 [   12.900000] [TRACE]download_firmware_88xx <===
 [   12.900000] >>SetBeaconDownload88XX
-[   12.900000] Init Download FW OK 
+[   12.900000] Init Download FW OK
 [   12.900000] [TRACE]cfg_la_mode_88xx ===>
 [   12.900000] [TRACE]cfg_la_mode_88xx <===
 [   12.900000] [TRACE]init_mac_cfg_88xx ===>
@@ -339,7 +339,7 @@ reinitd[942]:init: (2)"RTNETLINK answers: Cannot assign requested address" < ip 
 [   13.570000] [GetHwReg88XX][size PHY_REG_PG_8812Fmp_Type0]
 [   13.590000] [GetHwReg88XX][PHY_REG_PG_8812Fmp_Type0]
 [   13.810000] start_addr=(0x20000), end_addr=(0x40000), buffer_size=(0x20000), smp_number_max=(16384)
-[   13.810000] [set_8812F_trx_regs] +++ 
+[   13.810000] [set_8812F_trx_regs] +++
 [   14.310000] RTL8812F: INIT GPIO over PCI is OK!
 [   14.360000] br0: port 9(wlan1) entered forwarding state
 [   14.380000] br0: port 9(wlan1) entered forwarding state
@@ -350,10 +350,8 @@ reinitd[942]:init: (2)"RTNETLINK answers: Cannot assign requested address" < ip 
 [   14.460000] br0: port 1(eth0) entered forwarding state
 [   14.470000] br0: port 1(eth0) entered forwarding state
 reinitd[942]:init: LAN static IP: 192.168.0.254/24
-
 WiFi Simple Config v2.20-wps2.0 (2021.02.11-14:05+0000).
-
-sysmond[904]: poll handler of `net` work overtime: 1637 > 500
+sysmond[904]: poll handler of net work overtime: 1637 > 500
 sysmond[904]: poll: loop overtime: 2536 > 1000
 Register to wlan0
 Register to wlan1
@@ -364,7 +362,8 @@ timelycheck[1137]: #timelicheck v1.1.0
 dual boot utility: start
 dual boot utility: linux_offset=0x30000, rootfs_offset=0x270000, back_linux_offset=0x830000, back_rootfs_offset=0xA70000
 
-# dual boot utility: image already copied to backup bank
+dual boot utility: image already copied to backup bank
+
 timelycheck[1137]: Start wdscfgd
 ```
 
