@@ -6,7 +6,7 @@ This is an engineering provenance review, not legal advice.
 Заголовки лицензий и авторские права в файлах остаются как есть и имеют приоритет
 над этим обзором. / File-level notices are kept intact and take precedence.
 
-Также, этот репозиторий является форком <https://github.com/Elengal/openwrt-rx23302>, созданный для похожего роутера (Transerv 7022)
+Также этот репозиторий является форком <https://github.com/Elengal/openwrt-rx23302>, изначально созданного для роутера RX-23302, и адаптируется под аппаратно близкую модель Transerv TS-7022.
 
 ## База / Base
 
