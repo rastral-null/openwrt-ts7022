@@ -1,3 +1,11 @@
 __pycache__/
 *.pyc
 /build/
+/build-ts7022/
+/backup/
+*.log
+/*.bin
+/*.img
+/*.tar
+/*.tar.gz
+/*.zip

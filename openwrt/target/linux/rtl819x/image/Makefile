@@ -17,6 +17,17 @@ include $(INCLUDE_DIR)/image.mk
 DEVICE_VARS += CVIMG_KERNEL_BURN_ADDR CVIMG_LOADER_START_ADDR
 DEVICE_VARS += CVIMG_CUSTOM_SIGNATURE CVIMG_ROOTFS_BURN_ADDR
 
+# Адрес, по которому живёт сам loader.
+#
+# Обычное ядро разжимается в 0x80000000 и занимает ~6.5 МБ, поэтому 0x81000000
+# свободен. Initramfs-ядро несёт внутри несжатый cpio и разжимается в ~19 МБ
+# (0x80000000..0x81217400): на 0x81000000 оно затирает код самого loader'а, и
+# вместо загрузки получается "Undefined Exception happen." от загрузчика.
+# Для initramfs кладём loader выше образа и грузим его туда же (XMOD/J 0x82000000),
+# тогда распаковка идёт вниз, ничего не перекрывая.
+LZMA_TEXT_START_MAIN	:= 0x81000000
+LZMA_TEXT_START_INITRAMFS := 0x82000000
+
 define Build/loader-common
 	rm -rf $@.src
 	$(MAKE) -C lzma-loader \
@@ -24,7 +35,8 @@ define Build/loader-common
 		TARGET_DIR="$(dir $@)" LOADER_NAME="$(notdir $@)" \
 		BOARD="$(DEVICE_NAME)" \
 		SUBTARGET="$(SUBTARGET)" \
-		LZMA_TEXT_START=0x81000000 LOADADDR=0x80000000 \
+		LZMA_TEXT_START=$(if $(findstring initramfs,$(notdir $@)),$(LZMA_TEXT_START_INITRAMFS),$(LZMA_TEXT_START_MAIN)) \
+		LOADADDR=0x80000000 \
 		$(1) compile loader.bin
 	mv "$@.bin" "$@"
 	rm -rf $@.src
@@ -71,11 +83,24 @@ define Build/rx23302-full
 	$(TOPDIR)/scripts/rx23302-full-image.py $(IMAGE_KERNEL) $(IMAGE_ROOTFS) $@
 endef
 
+# TS-7022: ядро KM70 | 0xFF до 0x270000 | rootfs с суммой загрузчика.
+define Build/ts7022-full
+	$(TOPDIR)/scripts/ts7022-full-image.py $(IMAGE_KERNEL) $(IMAGE_ROOTFS) $@
+endef
+
 # tftp-factory.bin: тот же full.bin, разложенный на блоки KE32 + RE32 для
 # аварийного TFTP заводского загрузчика (Reset при включении, 192.168.1.6).
 define Build/rx23302-tftp
 	$(TOPDIR)/scripts/rx23302-full-image.py $(IMAGE_KERNEL) $(IMAGE_ROOTFS) $@.full
 	$(TOPDIR)/scripts/rx23302-tftp-image.py $@.full $@
+	rm -f $@.full
+endef
+
+# TS-7022 tftp-factory.bin: full.bin, разложенный на блоки KM70 + RM70 для
+# аварийного TFTP заводского загрузчика (Reset при включении, 192.168.1.6).
+define Build/ts7022-tftp
+	$(TOPDIR)/scripts/ts7022-full-image.py $(IMAGE_KERNEL) $(IMAGE_ROOTFS) $@.full
+	$(TOPDIR)/scripts/ts7022-tftp-image.py $@.full $@
 	rm -f $@.full
 endef
 

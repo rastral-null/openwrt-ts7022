@@ -1,0 +1,259 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * TRANSERV TS-7022 (МТС) — Realtek RTL8197F-VG
+ *
+ * Данные сняты с живого устройства 2026-11-25:
+ *   /proc/cpuinfo, /proc/mtd, /proc/iomem, /proc/interrupts,
+ *   полный дамп флеша (16 МБ) и boot-log с холодного старта.
+ *
+ *   SoC     RTL8197F-VG (в логе "8197FS-VG"), MIPS 24Kc @ 999 МГц
+ *   DRAM    DDR2 533 МГц, 128 МБ ("Detect dram size = 128MB")
+ *   Flash   MXIC 16 МБ, erase 64K, SPI 15 МГц
+ *   Switch  RTL8367B, chip id 0x6367-0020
+ *   WiFi    2.4G встроенный RTL8197G; 5G RTL8812F по PCIe (10ec:f812)
+ *   UART    ttyS0 @ 0x18147000, 38400 8N1
+ *
+ * Отличия от ELECTRA RX23302 (эталонного порта):
+ *   - сигнатура загрузчика "KM70", а не "KE32";
+ *   - rootfs начинается с 0x270000, а не с 0x300000;
+ *   - раздел kernel 0x30000..0x270000 (0x240000), а не 0x2d0000;
+ *   - 128 МБ ОЗУ;
+ *   - свитч RTL8367B (0x6367), а не RTL8367D (0x6642).
+ *
+ * Второй банк 0x800000..0x1000000 — заводская копия, только чтение.
+ * Область 0x0..0x30000 не трогать: bootcode (0x0..0x20000) и hwconfig
+ * (0x20000..0x30000) с MAC-адресами и калибровкой радио.
+ */
+
+/dts-v1/;
+
+#include "RTL8197FVG.dtsi"
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+
+/ {
+	compatible = "transerv,ts7022", "realtek,rtl8197f-soc";
+	model = "TRANSERV TS-7022";
+
+	memory {
+		device_type = "memory";
+		reg = <0x0 0x8000000>;
+	};
+
+	chosen {
+		bootargs = "console=ttyS0,38400";
+	};
+};
+
+&ethernet {
+	status = "okay";
+
+	/*
+	 * MAC из заводской таблицы hwconfig: заголовок "H601" на 0x20000,
+	 * первая запись по 0x20007. В нашем дампе там f4:e5:78:66:61:0e.
+	 */
+	nvmem-cells = <&mac_factory>;
+	nvmem-cell-names = "mac-address";
+};
+
+&spi0 {
+	status = "okay";
+
+	flash@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+
+		/* Как у стока: 15 МГц, делитель 7. */
+		spi-max-frequency = <15000000>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "boot";
+				reg = <0x000000 0x030000>;
+				read-only;
+
+				#address-cells = <1>;
+				#size-cells = <1>;
+
+				nvmem-layout {
+					compatible = "fixed-layout";
+					#address-cells = <1>;
+					#size-cells = <1>;
+
+					mac_factory: macaddr@20007 {
+						compatible = "mac-base";
+						reg = <0x20007 0x6>;
+					};
+				};
+			};
+
+			partition@30000 {
+				label = "kernel";
+				reg = <0x030000 0x240000>;
+			};
+
+			partition@270000 {
+				label = "rootfs";
+				reg = <0x270000 0x390000>;
+			};
+
+			partition@600000 {
+				label = "rootfs_data";
+				reg = <0x600000 0x1a0000>;
+			};
+
+			partition@7a0000 {
+				label = "cfg";
+				reg = <0x7a0000 0x060000>;
+				read-only;
+			};
+
+			partition@800000 {
+				label = "stock";
+				reg = <0x800000 0x800000>;
+				read-only;
+			};
+		};
+	};
+};
+
+/*
+ * GPIO: два банка по 32 линии. gpio0 - линии 0..31, gpio1 - 32..63
+ * (номер линии внутри банка = линия - 32). Оба контроллера в dtsi
+ * выключены, включаем здесь.
+ */
+&gpio0 {
+	status = "okay";
+};
+
+&gpio1 {
+	status = "okay";
+};
+
+/*
+ * Светодиоды. Таблица снята со стокового ядра (0x6557b0, num_leds=3):
+ *
+ *   имя       линия  вывод  активный уровень
+ *   wifi2.4   33     E1     0 (низкий = горит)
+ *   wifi5     100    -      0
+ *   wps       57     H1     0
+ *
+ * wifi5 на линии 100 сидит не на этих контроллерах (банки кончаются на
+ * 63) и в стоке зажигается отдельным путём rtlk_set_led из драйвера
+ * радио, поэтому в gpio-leds его нет: 5G будет работать без лампы.
+ *
+ * У wifi2.4 пин E1 по умолчанию занят альтернативной функцией; setup.c
+ * переводит его в GPIO (BSP_PIN_MUX_SEL17, 0xB8000844, бит 28), но
+ * драйвер радио после своего probe забирает пин обратно - поэтому
+ * init.d/rx23302-led повторяет эту запись на каждой загрузке.
+ *
+ * Триггер в стоке - none: лампами управляет userspace. У нас wifi2.4
+ * зажигается сразу (видно, что устройство живо), а netdev-триггер на
+ * wlan0 ставит uci-defaults/99-rx23302-leds.
+ */
+/ {
+	leds {
+		compatible = "gpio-leds";
+
+		wifi24_led: wifi2.4 {
+			label = "green:wifi2.4";
+			gpios = <&gpio1 1 GPIO_ACTIVE_LOW>;	/* линия 33, E1 */
+			default-state = "on";
+		};
+
+		wps_led: wps {
+			label = "green:wps";
+			gpios = <&gpio1 25 GPIO_ACTIVE_LOW>;	/* линия 57, H1 */
+			default-state = "off";
+		};
+	};
+};
+
+/*
+ * Кнопки. Из стоковой функции rtl819x_gpio_peripheral_init (0x807218fc)
+ * в platform_data уходят линии 54 и 56, обе активны низким уровнем
+ * (flags = 1), плюс 57 - это светодиод wps, а не кнопка.
+ *
+ *   reset  линия 54, G6  -> KEY_RESTART
+ *   wps    линия 56, H0  -> KEY_WPS_BUTTON
+ *
+ * Опрос, а не прерывания: прерывания этого GPIO-контроллера не проверены.
+ */
+/ {
+	keys {
+		compatible = "gpio-keys-polled";
+		poll-interval = <20>;
+
+		reset {
+			label = "reset";
+			gpios = <&gpio1 22 GPIO_ACTIVE_LOW>;	/* линия 54, G6 */
+			linux,code = <KEY_RESTART>;
+			debounce-interval = <60>;
+		};
+
+		wps {
+			label = "wps";
+			gpios = <&gpio1 24 GPIO_ACTIVE_LOW>;	/* линия 56, H0 */
+			linux,code = <KEY_WPS_BUTTON>;
+			debounce-interval = <60>;
+		};
+	};
+};
+
+/*
+ * Внешний коммутатор RTL8367RB-VB (номер 0x6367, версия 0x0020).
+ *
+ * Драйвер rtl8367b (swconfig, switch0). Шина SMI на GPIO: SCK - линия 25,
+ * SDA - линия 31, сброс - линия 58. Номера линий взяты из стоковой
+ * функции smi_init(group=3, sck=1, sda=7): линия = (группа << 3) | бит,
+ * то есть 24+1 и 24+7, и из platform_data линии сброса 58.
+ *
+ * realtek,cpu-port = <6>: драйвер считает id = cpu_port - 5 = 1, а
+ * SDK для EXT_PORT0 (16) тоже даёт ext_id 1 (ext_id = port - 15).
+ * Это ровно те регистры, которые писал сток: 0x1311 (форс-линк) и
+ * 0x1307 (задержки RGMII). Не 7, как у RX23302: там другой чип и
+ * другой внешний интерфейс (ext_id 2, регистры 0x13c4/0x13c5).
+ *
+ * realtek,extif = <cpu_port txdelay rxdelay mode force_mode txpause
+ *                  rxpause link duplex speed>
+ *   cpu_port 6, txdelay 0, rxdelay 5, mode 1 (RGMII),
+ *   force_mode 1, txpause 1, rxpause 1, link 1, duplex 1, speed 2 (1000M)
+ *
+ * Значения сняты с работающего стока (RTL83XX_init, 0x801fb338):
+ * rtk_port_macForceLinkExt_set(EXT_PORT0, RGMII, {...}) -> 0x1311 = 0x1076,
+ * затем rtk_port_rgmiiDelayExt_set(EXT_PORT0, tx=0, rx=2), позже rx=5 ->
+ * 0x1307 = 0x0005. Драйвер сам собирает из этих десяти чисел те же самые
+ * 0x1076 и 0x0005, поэтому init-regs для них не нужны.
+ *
+ * Гнёзда на внешнем коммутаторе: 0 - синий WAN, 1..4 - LAN1..LAN4.
+ * Порты 5..7 не разведены.
+ *
+ * realtek,init-regs здесь СОЗНАТЕЛЬНО нет: таблица RX23302 написана для
+ * другого чипа (Family D, 0x6642) и на 8367RB (Family C) ломает RGMII.
+ * Всё остальное делает таблица самого драйвера (rtl8367c_initvals),
+ * она же совпадает с веткой type 2 стоковой инициализации.
+ */
+/ {
+	switch0: switch {
+		compatible = "realtek,rtl8367b";
+		sck-gpios = <&gpio0 25 GPIO_ACTIVE_HIGH>;	/* линия 25, D1 */
+		sda-gpios = <&gpio0 31 GPIO_ACTIVE_HIGH>;	/* линия 31, D7 */
+		reset-gpios = <&gpio1 26 GPIO_ACTIVE_LOW>;	/* линия 58, H2 */
+		realtek,cpu-port = <6>;
+		realtek,extif = <6 0 5 1 1 1 1 1 1 2>;
+	};
+};
+
+/*
+ * PCIe не включаем, как и на RX23302: у released-сборки RX23302 5 ГГц
+ * работает на том же RTL8812F при выключенном pcie0 - радио поднимает
+ * сам драйвер 8192fe через свои шинные функции, а не через PCIe-хост.
+ */
+
