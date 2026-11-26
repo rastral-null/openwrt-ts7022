@@ -1,12 +1,16 @@
 # SPDX-License-Identifier: GPL-2.0-only
 #
-# sysupgrade для ELECTRA RX23302 (Ротек RX-23302).
+# sysupgrade для плат на RTL8197F: ELECTRA RX23302 и TRANSERV TS-7022.
 #
 # Образ sysupgrade.bin = full.bin + метаданные fwtool:
-#   0x000000  ядро с заголовком KE32 (cvimg), добито 0xFF до 0x2d0000
-#   0x2d0000  rootfs (squashfs + 2 байта суммы загрузчика)
-# Во флеше это разделы kernel (0x30000) и rootfs (0x300000); настройки
-# живут отдельно, в rootfs_data (0x600000), а не за rootfs.
+#   0x000000  ядро с заголовком (cvimg), добито 0xFF до конца раздела kernel
+#   K         rootfs (squashfs + 2 байта суммы загрузчика)
+# Во флеше это разделы kernel (0x30000) и rootfs (K), настройки живут
+# отдельно, в rootfs_data, а не за rootfs:
+#
+#   плата    сигнатура  kernel (0x30000)  rootfs
+#   RX23302  KE32       0x2d0000          0x300000
+#   TS-7022  KM70       0x240000          0x270000
 #
 # Порядок записи выбран так, чтобы прерванное обновление (выключили свет)
 # не превращало роутер в кирпич:
@@ -14,21 +18,42 @@
 #   2. записать rootfs;
 #   3. записать kernel - последним.
 # Если запись оборвётся на шагах 1-3, загрузчик не найдёт годного ядра,
-# скопирует заводскую прошивку из второго банка (0x830000) и загрузит её.
-# Старое ядро с новым rootfs (или наоборот) не загрузится никогда.
+# скопирует заводскую прошивку из второго банка и загрузит её. Старое ядро
+# с новым rootfs (или наоборот) не загрузится никогда.
 #
-# sysupgrade for the RX23302. The image is full.bin plus fwtool metadata.
-# Order: erase kernel, write rootfs, write kernel last - an interrupted
-# upgrade leaves no valid kernel, and the bootloader restores the stock
-# firmware from bank 2 instead of booting a mismatched kernel/rootfs pair.
+# sysupgrade for the RTL8197F boards. The image is full.bin plus fwtool
+# metadata. Order: erase kernel, write rootfs, write kernel last - an
+# interrupted upgrade leaves no valid kernel, and the bootloader restores the
+# stock firmware from bank 2 instead of booting a mismatched kernel/rootfs.
 
 REQUIRE_IMAGE_METADATA=1
 
-RX23302_KERNEL_SIZE=$((0x2d0000))
-RX23302_ROOTFS_SIZE=$((0x300000))
+# Переменные платы: KERNEL_SIZE, ROOTFS_SIZE, MAGIC (первые 4 байта образа),
+# SIG (та же сигнатура текстом) и MODEL (имя профиля для сообщений).
+platform_vars() {
+	case "$(board_name)" in
+	electra,rx23302)
+		KERNEL_SIZE=$((0x2d0000))
+		ROOTFS_SIZE=$((0x300000))
+		MAGIC="4b453332"
+		SIG="KE32"
+		MODEL="electra_rx23302"
+		;;
+	transerv,ts7022)
+		KERNEL_SIZE=$((0x240000))
+		ROOTFS_SIZE=$((0x390000))
+		MAGIC="4b4d3730"
+		SIG="KM70"
+		MODEL="transerv_ts7022"
+		;;
+	*)
+		return 1
+		;;
+	esac
+}
 
 # Размер образа без хвоста метаданных fwtool.
-rx23302_image_size() {
+platform_image_size() {
 	fwtool -q -T -i /dev/null "$1" | wc -c
 }
 
@@ -38,33 +63,38 @@ platform_check_image() {
 
 	[ "$#" -gt 1 ] && return 1
 
-	magic=$(get_magic_long "$img")
-	[ "$magic" = "4b453332" ] || {
-		v "Not an RX23302 image: no KE32 kernel header (got $magic)."
-		v "Use openwrt-*-electra_rx23302-squashfs-sysupgrade.bin."
+	platform_vars || {
+		v "Unsupported board: $(board_name)."
 		return 1
 	}
 
-	# Адрес записи ядра из заголовка KE32 (байты 8..11) - только 0x30000.
+	magic=$(get_magic_long "$img")
+	[ "$magic" = "$MAGIC" ] || {
+		v "Not a $SIG image: no $SIG kernel header (got $magic)."
+		v "Use openwrt-*-$MODEL-squashfs-sysupgrade.bin."
+		return 1
+	}
+
+	# Адрес записи ядра из заголовка (байты 8..11) - только 0x30000.
 	burn=$(dd if="$img" bs=1 skip=8 count=4 2>/dev/null | hexdump -v -n 4 -e '1/1 "%02x"')
 	[ "$burn" = "00030000" ] || {
 		v "Kernel burn address $burn is not 00030000 - wrong image."
 		return 1
 	}
 
-	sq=$(dd if="$img" bs=4096 skip=$((RX23302_KERNEL_SIZE / 4096)) count=1 2>/dev/null | \
+	sq=$(dd if="$img" bs=4096 skip=$((KERNEL_SIZE / 4096)) count=1 2>/dev/null | \
 		hexdump -v -n 4 -e '1/1 "%02x"')
 	case "$sq" in
 	68737173|73717368) ;;
 	*)
-		v "No squashfs at offset 0x2d0000 (got $sq) - this is not a full image."
+		v "No squashfs at offset 0x$(printf '%x' "$KERNEL_SIZE") (got $sq) - this is not a full image."
 		return 1
 		;;
 	esac
 
-	size=$(rx23302_image_size "$img")
-	[ "$size" -gt "$RX23302_KERNEL_SIZE" ] && \
-	[ "$size" -le $((RX23302_KERNEL_SIZE + RX23302_ROOTFS_SIZE)) ] || {
+	size=$(platform_image_size "$img")
+	[ "$size" -gt "$KERNEL_SIZE" ] && \
+	[ "$size" -le $((KERNEL_SIZE + ROOTFS_SIZE)) ] || {
 		v "Image size $size is out of range."
 		return 1
 	}
@@ -74,7 +104,10 @@ platform_check_image() {
 
 platform_do_upgrade() {
 	local img="$1"
-	local kblocks=$((RX23302_KERNEL_SIZE / 4096))
+	local kblocks
+
+	platform_vars || exit 1
+	kblocks=$((KERNEL_SIZE / 4096))
 
 	# Хвост метаданных во флеш не нужен.
 	fwtool -q -t -i /dev/null "$img"

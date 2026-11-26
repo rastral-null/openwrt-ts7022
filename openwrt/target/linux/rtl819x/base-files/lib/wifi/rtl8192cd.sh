@@ -41,9 +41,9 @@ detect_rtl8192cd() {
 
 		devidx="${dev#wlan}"
 		if rtl8192cd_is_5g "$dev"; then
-			band=5g; channel=36; htmode=VHT80; ssid=RX23302-5G
+			band=5g; channel=36; htmode=VHT80; ssid=TS-7022-5G
 		else
-			band=2g; channel=1; htmode=HT20; ssid=RX23302
+			band=2g; channel=1; htmode=HT20; ssid=TS-7022
 		fi
 
 		uci -q batch <<-EOF

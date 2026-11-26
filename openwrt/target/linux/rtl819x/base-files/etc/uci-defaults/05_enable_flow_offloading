@@ -17,7 +17,10 @@
 
 . /lib/functions.sh
 
-[ "$(board_name)" = "electra,rx23302" ] || exit 0
+case "$(board_name)" in
+	electra,rx23302|transerv,ts7022) ;;
+	*) exit 0 ;;
+esac
 
 uci -q get firewall.@defaults[0] >/dev/null || exit 0
 

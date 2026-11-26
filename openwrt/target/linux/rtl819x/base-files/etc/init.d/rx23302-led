@@ -1,5 +1,5 @@
 #!/bin/sh /etc/rc.common
-# RX23302: re-assert the 2.4G LED pin E1 -> GPIO function on every boot.
+# Re-assert the 2.4G LED pin E1 -> GPIO function on every boot.
 #
 # setup.c muxes E1 to GPIO early (arch_initcall), but the WiFi driver
 # re-programs the pinmux after its probe and reclaims E1, so the gpio-led
@@ -8,10 +8,19 @@
 #
 # BSP_PIN_MUX_SEL17 = 0xB8000844, E1 field bits 28-31 = 1 (GPIO function),
 # taken verbatim from the vendor SDK rtl819x_gpio_mux() case BSP_GPIO_PIN_E1.
+#
+# Both boards use the same RTL8197F pinmux and the same 2.4G LED on E1
+# (line 33): RX23302's "green:status" and TS-7022's "green:wifi2.4".
 START=95
 
 start() {
 	local v
+
+	case "$(board_name)" in
+	electra,rx23302|transerv,ts7022) ;;
+	*) return 0 ;;
+	esac
+
 	v=$(devmem 0xB8000844 2>/dev/null)
 	[ -n "$v" ] && devmem 0xB8000844 32 "$(printf '0x%08x' $(( v | 0x10000000 )))"
 }

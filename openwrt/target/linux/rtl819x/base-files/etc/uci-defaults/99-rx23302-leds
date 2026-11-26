@@ -1,12 +1,18 @@
 #!/bin/sh
-# RX23302: register board LEDs in /etc/config/system so they work out of the
-# box after flashing and are editable in LuCI (System -> LED Configuration).
-#   Status    : steady on = system OK (no suspicious blinking).
-#   WiFi 2.4G : netdev on wlan0, link + tx/rx -> lit when radio up, blinks on
-#               traffic (same behaviour as the port LEDs and the 5G LED).
+# Register board LEDs in /etc/config/system so they work out of the box after
+# flashing and are editable in LuCI (System -> LED Configuration).
+#
+#   RX23302  Status    : steady on = system OK (no suspicious blinking).
+#            WiFi 2.4G : netdev on wlan0, link + tx/rx.
+#   TS-7022  WiFi 2.4G : same, pin E1 / line 33.
+#            WPS       : plain GPIO, off unless something drives it.
+#
 # The 5G LED is driven by the RTL8812F hardware LED engine (reg 0x62), not by
 # gpio-leds, so it is not listed here and needs no user configuration.
-uci -q batch <<'EOF'
+
+case "$(board_name)" in
+	electra,rx23302)
+		uci -q batch <<'EOF'
 set system.status_led=led
 set system.status_led.name='Status'
 set system.status_led.sysfs='green:status'
@@ -19,5 +25,26 @@ set system.wifi24_led.dev='wlan0'
 set system.wifi24_led.mode='link tx rx'
 commit system
 EOF
+		;;
+	transerv,ts7022)
+		uci -q batch <<'EOF'
+set system.wifi24_led=led
+set system.wifi24_led.name='WiFi 2.4G'
+set system.wifi24_led.sysfs='green:wifi2.4'
+set system.wifi24_led.trigger='netdev'
+set system.wifi24_led.dev='wlan0'
+set system.wifi24_led.mode='link tx rx'
+set system.wps_led=led
+set system.wps_led.name='WPS'
+set system.wps_led.sysfs='green:wps'
+set system.wps_led.trigger='none'
+commit system
+EOF
+		;;
+esac
+
+# E1 (line 33) is muxed back to the radio by the WiFi driver after probe;
+# re-assert the GPIO function before init.d/led (START=96) runs.
 /etc/init.d/rx23302-led enable
+
 exit 0

@@ -1,0 +1,37 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Generate /etc/config/wireless for the vendor rtl8192cd/rtl8192fe driver.
+#
+# /etc/init.d/boot runs `/sbin/wifi config` BEFORE `/sbin/kmodloader`, so at
+# that moment /proc/wlanN does not exist yet and no radios are detected. The
+# vendor driver is not mac80211, so it emits no ieee80211 hotplug event after
+# loading either (that event is what normally re-runs `wifi config`). Net
+# result on a factory-fresh image: /etc/config/wireless has no radios and the
+# Wi-Fi stays down out of the box.
+#
+# uci-defaults run AFTER kmodloader (boot(): `/sbin/kmodloader` then
+# `uci_apply_defaults`), so re-running `wifi config` here sees /proc/wlanN and
+# writes both radios. netifd then brings them up on the later `network` start.
+
+. /lib/functions.sh
+
+case "$(board_name)" in
+	electra,rx23302|transerv,ts7022) ;;
+	*) exit 0 ;;
+esac
+
+# Already configured (e.g. upgrade over an existing config): keep it.
+[ -n "$(uci -q get wireless.radio0)" ] && exit 0
+
+# Driver not loaded yet: leave this script in /etc/uci-defaults so it is
+# applied again on the next boot instead of being consumed.
+[ -d /proc/wlan0 ] || exit 1
+
+/sbin/wifi config
+
+# `wifi config` exits 0 even when it finds nothing; only mark done once a
+# radio actually landed in the config.
+[ -n "$(uci -q get wireless.radio0)" ] || exit 1
+
+exit 0
