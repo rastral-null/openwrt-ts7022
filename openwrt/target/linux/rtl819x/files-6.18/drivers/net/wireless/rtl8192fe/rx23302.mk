@@ -1,5 +1,6 @@
-# RX23302: конфиг драйвера для сборки В ЯДРЕ (из build-dual.sh).
-CONFIG_RTL8192CD := y
+# RX23302: конфиг драйвера. Собираем модулем (rtl8192cd.ko): встроенный
+# вариант занимал kernel > 0x240000 и вешал загрузку на rtl8192cd_init_one.
+CONFIG_RTL8192CD := m
 CONFIG_WIFI_HCI := y
 CONFIG_PCI_HCI := y
 CONFIG_WLAN_HAL := y

@@ -22,6 +22,6 @@ endef
 
 include $(INCLUDE_DIR)/target.mk
 
-DEFAULT_PACKAGES += kmod-leds-gpio kmod-gpio-button-hotplug rtlmib
+DEFAULT_PACKAGES += kmod-leds-gpio kmod-gpio-button-hotplug kmod-rtl8192cd rtlmib
 
 $(eval $(call BuildTarget))

@@ -34,7 +34,7 @@ CONFIG_CRYPTO_LIB_POLY1305_RSIZE=2
 CONFIG_CRYPTO_LIB_SHA1=y
 CONFIG_CRYPTO_LIB_UTILS=y
 CONFIG_CSRC_R4K=y
-CONFIG_DEBUG_INFO=y
+# CONFIG_DEBUG_INFO is not set
 CONFIG_DMA_NEED_SYNC=y
 CONFIG_DMA_NONCOHERENT=y
 CONFIG_DTB_RTK_NONE=y
@@ -230,20 +230,19 @@ CONFIG_PHYLINK=y
 CONFIG_RTL8366_SMI=y
 CONFIG_RTL8367B_PHY=y
 CONFIG_RTL8366_SMI_DEBUG_FS=y
-# Радиочасть временно выключена: драйвер доходит до rtl8192cd_init_one
-# и виснет, а встроенным он собирается только как bool, то есть вешает
-# всю загрузку. Пока цель — рабочая проводная прошивка в постоянной
-# памяти. Сборочный файл вендора строит единый rtl8192cd.o, так что
-# позже его можно перевести в tristate и грузить модулем вручную.
-CONFIG_WLAN_HAL=y
-CONFIG_WLAN_HAL_88XX=y
+# Радио для первого теста выключено: драйвер rtl8192fe добавляет заметный
+# кусок к ядру, а раздел kernel у TS-7022 всего 0x240000 (на 0x90000 меньше,
+# чем у RX23302). Сначала проверяем загрузку и проводную часть, потом
+# вернём драйвер — лучше модулем или с уменьшенным ядром.
+CONFIG_RTL8192FE_RX23302=m
+# CONFIG_WLAN_HAL is not set
+# CONFIG_WLAN_HAL_88XX is not set
 # CONFIG_WLAN_MACHAL_API is not set
-CONFIG_WLAN_HAL_8197F=y
-CONFIG_RTL_ODM_WLAN_DRIVER=y
-CONFIG_PCI_HCI=y
+# CONFIG_WLAN_HAL_8197F is not set
+# CONFIG_RTL_ODM_WLAN_DRIVER is not set
+# CONFIG_PCI_HCI is not set
 # CONFIG_PCI is not set
 # CONFIG_PCI_QUIRKS is not set
-CONFIG_RTL8192FE_RX23302=y
 CONFIG_WIRELESS_EXT=y
 CONFIG_WEXT_CORE=y
 CONFIG_WEXT_PRIV=y

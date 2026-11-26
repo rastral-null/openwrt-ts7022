@@ -15,9 +15,9 @@
 #   Так же у sowarden/hh71vm-openwrt (RTL8197FS + RTL8812FE) и в openwrt-AC10
 #   (Tenda AC10, RTL8197F): RTL_COMAPI_WLTOOLS + select WEXT_PRIV.
 config RTL8192FE_RX23302
-	bool "Realtek rtl8192fe (RTL8197G + RTL8812FE) для RX23302"
+	tristate "Realtek rtl8192fe (RTL8197G + RTL8812FE) для RX23302"
 	depends on MIPS
-	default y
+	default m
 	select WIRELESS_EXT
 	select WEXT_PRIV
 	help
