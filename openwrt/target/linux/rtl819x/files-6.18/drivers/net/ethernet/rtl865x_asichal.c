@@ -10,8 +10,9 @@
  * Отличия от донора (наша плата RX23302):
  *   - WAN = VID 8 / гнездо 0 (маска L2 0x01), LAN = VID 9 / гнёзда 3-4;
  *   - имена интерфейсов eth0.8 (WAN) / eth0.9 (LAN);
- *   - сети: LAN 192.168.0.0/24, WAN 192.168.1.0/24 (обе process=RT_ARP,
- *     как у стока), extIP живой — 192.168.1.x учится по потокам;
+ *   - сети: route[2]/[3] программируются по живым адресам br-lan и eth0.8
+ *     (/24, process=RT_ARP, как у стока); extIP живой — учится по потокам,
+ *     и по нему же обновляется WAN-строка route[3];
  *   - VLAN/PVID/MACCR1/P0GMIICR НЕ трогаем — ими владеет rtl819x_eth.c
  *     (раскладка портов и режим роутера);
  *   - PPPoE не портировали (стенд на ethernet-WAN).
@@ -294,6 +295,11 @@ static u32 gw_lan_client_ip = 0xC0A80002;		/* 192.168.0.2 */
 /* L2-строка WAN-пира (индекс строки), кладётся при программировании цепочки;
  * нужна, чтобы писать ARP-строки подключённой WAN-сети (route[3], process=ARP) */
 static u32 gw_wan_nh;
+/* Сеть route[3], запрограммированная сейчас (host order, /24). 0 = строки нет. */
+static u32 gw_wan_route_net;
+
+static bool gw_iface_net24(const char *ifname, u32 *net);
+static bool gw_wan_ip_in_subnet(u32 ip);
 u32 rtl865x_wan_extip = RTL865X_WAN_EXTIP;
 
 /* ---- NAPT: хеш1 вендора (rtl8651_naptTcpUdpTableIndex), ДОСЛОВНО -------- */
@@ -361,12 +367,34 @@ int rtl865x_napt_read(u32 idx, struct asic_napt_tcpudp *out)
 int rtl865x_set_wan_extip(u32 ip)
 {
 	struct asic_extintip ext;
-	int rc;
+	struct asic_l3route_arp rt;
+	u32 net24 = ip & 0xffffff00u;
+	int rc, changed = 0;
 
 	if (!ip)
 		return -EINVAL;
+
+	/* route[3] — подключённая WAN-подсеть. DHCP мог выдать другую сеть,
+	 * чем та, что была при программировании каркаса (или адреса не было
+	 * вовсе). Обновляем по extIP, но только если он лежит в сети eth0.8:
+	 * при PPPoE extIP публичный, и /24 к нему отношения не имеет. */
+	if (gw_wan_ip_in_subnet(ip) && net24 != gw_wan_route_net) {
+		memset(&rt, 0, sizeof(rt));
+		rt.ipAddr = net24;
+		rt.ipMask = gw_asicmask(24); rt.valid = 1; rt.process = 2;
+		rt.netif = 1;
+		rt.internal = 0; rt.ARPStart = 32; rt.ARPEnd = 63;
+		rt.ARPIpIdx = 0;
+		rc = rtl865x_asic_write_entry(ASIC_TYPE_L3_ROUTING, 3, &rt, true);
+		if (rc)
+			return rc;
+		gw_wan_route_net = net24;
+		changed = 1;
+		pr_info("rtl865x gw: route[3] WAN %pI4h/24 -> netif1\n", &net24);
+	}
+
 	if (ip == rtl865x_wan_extip)
-		return 0;
+		return changed;
 	memset(&ext, 0, sizeof(ext));
 	ext.externalIP = ip;	/* числовое: ASIC сверяет как слово */
 	ext.valid = 1;
@@ -459,6 +487,68 @@ int rtl865x_wan_netif_mac_sync(void)
 		return 0;
 	gw_wan_netif_prog_locked();
 	return 1;
+}
+
+/* Первый IPv4-адрес живого интерфейса (host order). false — адреса нет. */
+static bool gw_iface_addr(const char *ifname, u32 *ip)
+{
+	struct net_device *dev = dev_get_by_name(&init_net, ifname);
+	struct in_device *in_dev;
+	struct in_ifaddr *ifa;
+	bool found = false;
+
+	if (!dev)
+		return false;
+	in_dev = in_dev_get(dev);
+	dev_put(dev);
+	if (!in_dev)
+		return false;
+	rcu_read_lock();
+	in_dev_for_each_ifa_rcu(ifa, in_dev) {
+		u32 addr = ntohl(ifa->ifa_address);
+
+		if (!addr)
+			continue;
+		*ip = addr;
+		found = true;
+		break;
+	}
+	rcu_read_unlock();
+	in_dev_put(in_dev);
+	return found;
+}
+
+/* Сетевой адрес /24 живого интерфейса (host order). Окно ARP в ASIC
+ * рассчитано на 256 строк, т.е. только /24: для /16 понадобилось бы 65536
+ * строк. Поэтому интерфейс с другой маской считается «без /24» и маршрут
+ * для него не программируется (трафик остаётся на софт-пути). */
+static bool gw_iface_net24(const char *ifname, u32 *net)
+{
+	struct net_device *dev = dev_get_by_name(&init_net, ifname);
+	struct in_device *in_dev;
+	struct in_ifaddr *ifa;
+	bool found = false;
+
+	if (!dev)
+		return false;
+	in_dev = in_dev_get(dev);
+	dev_put(dev);
+	if (!in_dev)
+		return false;
+	rcu_read_lock();
+	in_dev_for_each_ifa_rcu(ifa, in_dev) {
+		u32 addr = ntohl(ifa->ifa_address);
+		u32 mask = ntohl(ifa->ifa_mask);
+
+		if (!addr || mask != 0xffffff00u)
+			continue;
+		*net = addr & mask;
+		found = true;
+		break;
+	}
+	rcu_read_unlock();
+	in_dev_put(in_dev);
+	return found;
 }
 
 /* Лежит ли @ip в подсети живого eth0.8 (адрес и маска читаются с netdev).
@@ -568,7 +658,7 @@ static int gw_prog(struct seq_file *m, void *v)
 	struct asic_l3route_arp rt;
 	struct asic_l3route_nxthop nr;
 	u32 mac_hi, mac_lo, rb[8];
-	u32 mscr0, mscr1, wan_nh;
+	u32 mscr0, mscr1, wan_nh, lan_net = 0, wan_net = 0;
 	int rc, ok = 1;
 
 	mutex_lock(&rtl865x_hal_lock);
@@ -678,24 +768,40 @@ static int gw_prog(struct seq_file *m, void *v)
 		rtl865x_napt_prefill();
 
 	/* 10. маршруты:
-	 *  [2] LAN 192.168.0.0/24 -> netif0, process=RT_ARP, окно 0..31
-	 *      (сырые ARP-строки 0..255)
-	 *  [3] WAN 192.168.1.0/24 -> netif1, process=RT_ARP, окно 32..63
-	 *      (сырые 256..504) — ВКЛЮЧЁН по умолчанию: наша WAN — настоящая
-	 *      подсеть, и сток всегда так делает для подключённых сетей
+	 *  [2] LAN <живая подсеть br-lan>/24 -> netif0, process=RT_ARP,
+	 *      окно 0..31 (сырые ARP-строки 0..255)
+	 *  [3] WAN <живая подсеть eth0.8>/24 -> netif1, process=RT_ARP,
+	 *      окно 32..63 (сырые 256..504). Пока DHCP не выдал адрес, строка
+	 *      НЕ программируется: иначе дефолт 192.168.1.0/24 мог бы совпасть
+	 *      с LAN и увести LAN-трафик в WAN-netif. Первый поток запрограммирует
+	 *      её по extIP (rtl865x_set_wan_extip).
 	 *  [6]/[7] дефолт 0/0 (обе половины) -> process=5 NAPT-NextHop,
 	 *      nexthop[0..1] -> ARP[20] -> L2 WAN-пира; промах NAPT — в CPU */
 	memset(&rt, 0, sizeof(rt));
-	rt.ipAddr = 0xC0A80000;			/* 192.168.0.0/24 -> LAN */
-	rt.ipMask = gw_asicmask(24); rt.valid = 1; rt.process = 2; rt.netif = 0;
-	rt.internal = 1; rt.ARPStart = 0; rt.ARPEnd = 31;
-	rtl865x_asic_write_entry(ASIC_TYPE_L3_ROUTING, 2, &rt, true);
+	if (gw_iface_net24("br-lan", &lan_net) || gw_iface_net24("eth0.9", &lan_net)) {
+		rt.ipAddr = lan_net;		/* живая LAN /24 -> LAN */
+		rt.ipMask = gw_asicmask(24); rt.valid = 1; rt.process = 2;
+		rt.netif = 0;
+		rt.internal = 1; rt.ARPStart = 0; rt.ARPEnd = 31;
+		rtl865x_asic_write_entry(ASIC_TYPE_L3_ROUTING, 2, &rt, true);
+		pr_info("rtl865x gw: route[2] LAN %pI4h/24 -> netif0\n", &lan_net);
+	} else {
+		pr_warn("rtl865x gw: у br-lan нет адреса /24 — route[2] не запрограммирован\n");
+	}
 
 	memset(&rt, 0, sizeof(rt));
-	rt.ipAddr = 0xC0A80100;			/* 192.168.1.0/24 -> WAN */
-	rt.ipMask = gw_asicmask(24); rt.valid = 1; rt.process = 2; rt.netif = 1;
-	rt.internal = 0; rt.ARPStart = 32; rt.ARPEnd = 63; rt.ARPIpIdx = 0;
-	rtl865x_asic_write_entry(ASIC_TYPE_L3_ROUTING, 3, &rt, true);
+	if (gw_iface_net24("eth0.8", &wan_net)) {
+		rt.ipAddr = wan_net;		/* живая WAN /24 -> WAN */
+		rt.ipMask = gw_asicmask(24); rt.valid = 1; rt.process = 2;
+		rt.netif = 1;
+		rt.internal = 0; rt.ARPStart = 32; rt.ARPEnd = 63; rt.ARPIpIdx = 0;
+		rtl865x_asic_write_entry(ASIC_TYPE_L3_ROUTING, 3, &rt, true);
+		gw_wan_route_net = wan_net;
+		pr_info("rtl865x gw: route[3] WAN %pI4h/24 -> netif1\n", &wan_net);
+	} else {
+		gw_wan_route_net = 0;
+		pr_info("rtl865x gw: у eth0.8 ещё нет адреса — route[3] отложен до первого потока\n");
+	}
 
 	memset(&nr, 0, sizeof(nr));
 	nr.ipAddr = 0x80000000;			/* 128.0.0.0 (верхняя половина) */
@@ -717,8 +823,14 @@ static int gw_prog(struct seq_file *m, void *v)
 			 | (sel_cpu_reason ? (1u << 8) : 0u)
 			 | (swtcr1_trap_bits ? ((1u << 10) | (1u << 11)) : 0u));
 
-	/* 12. extIP[0] из тени (динамический) */
-	{
+	/* 12. extIP[0] (masquerade-адрес). Плейсхолдера нет: пока WAN-адрес
+	 * неизвестен, строку НЕ пишем — иначе «наш WAN IP» совпал бы с чужим
+	 * адресом (историческая константа 192.168.1.3 теперь лежит в LAN).
+	 * Источник: живой адрес eth0.8, иначе первый же поток вызовет
+	 * rtl865x_set_wan_extip() с настоящим NAT-адресом. */
+	if (!rtl865x_wan_extip)
+		gw_iface_addr("eth0.8", &rtl865x_wan_extip);
+	if (rtl865x_wan_extip) {
 		struct asic_extintip ext;
 
 		memset(&ext, 0, sizeof(ext));
@@ -726,6 +838,8 @@ static int gw_prog(struct seq_file *m, void *v)
 		ext.valid = 1;
 		ext.nextHop = 0;
 		rtl865x_asic_write_entry(ASIC_TYPE_EXT_INT_IP, 0, &ext, true);
+	} else {
+		pr_info("rtl865x gw: extIP[0] отложен (у eth0.8 нет адреса)\n");
 	}
 
 	/* ---- обратное чтение ---- */
@@ -739,11 +853,11 @@ static int gw_prog(struct seq_file *m, void *v)
 		   (((rb[2] & 0x7f) << 1) | ((rb[1] >> 31) & 1)),
 		   ((rb[2] >> 7) & 0xff));
 	rtl865x_asic_read_entry(ASIC_TYPE_L3_ROUTING, 2, rb);
-	seq_printf(m, "  ROUTE2 w0=%08x w1=%08x (192.168.0.0/24 process=ARP)\n",
-		   rb[0], rb[1]);
+	seq_printf(m, "  ROUTE2 w0=%08x w1=%08x (LAN %pI4h/24 process=ARP)\n",
+		   rb[0], rb[1], &lan_net);
 	rtl865x_asic_read_entry(ASIC_TYPE_L3_ROUTING, 3, rb);
-	seq_printf(m, "  ROUTE3 w0=%08x w1=%08x (192.168.1.0/24 process=ARP)\n",
-		   rb[0], rb[1]);
+	seq_printf(m, "  ROUTE3 w0=%08x w1=%08x (WAN %pI4h/24 process=ARP)\n",
+		   rb[0], rb[1], &gw_wan_route_net);
 	rtl865x_asic_read_entry(ASIC_TYPE_L3_ROUTING, 6, rb);
 	seq_printf(m, "  ROUTE6 w0=%08x w1=%08x (дефолт process=5 NAPT)\n",
 		   rb[0], rb[1]);

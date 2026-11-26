@@ -1386,9 +1386,9 @@ static void rtl819x_router_set(bool on)
 		rtl_sw_w(0xBB804058, rtl_sw_r(0xBB804058) & ~1u);
 		rtl_sw_w(0xBB80414C, 0x02037D57);
 		WRITE_ONCE(rtl819x_router, false);
-		rtl819x_intsw_pvid(0, RTL_NASH_VID);
+		rtl819x_intsw_pvid(0, RTL_WAN_VID);
 		ret = rtl819x_intsw_zapis_vlan(RTL_NASH_VID, RTL_LAN_PORTY,
-					       RTL_LAN_PORTY, 0);
+					       0x11E, 0);
 	}
 	pr_info("rtl819x: router mode %s (vlan %d) MACCR1=%08x P0GMIICR=%08x PVCR0=%08x\n",
 		on ? "ON" : "off", ret, rtl_sw_r(0xBB804058),
@@ -1703,32 +1703,46 @@ static void rtl819x_intsw_nastroit(void)
 		rtl_sw_r(RTL_PSRP(0)), rtl_sw_r(RTL_PSRP(1)),
 		rtl_sw_r(RTL_PSRP(3)));
 
-	ret = rtl819x_intsw_zapis_vlan(RTL_NASH_VID, RTL_LAN_PORTY,
-				       RTL_LAN_PORTY, 0);
+	/*
+	 * Маска без метки - ровно стоковая: 0x23D1E в строке 9, то есть
+	 * члены 1,2,3,4,8 и у всех снят тег. Порт 0 добавлен членом, но
+	 * ОСТАЁТСЯ С МЕТКОЙ: это транк RGMII к внешнему RTL8367RB, и по нему
+	 * в обе стороны ходят кадры с тегами 9 (LAN) и 8 (WAN). Снять тег на
+	 * порту 0 значило бы отдать внешнему свитчу кадр без номера группы -
+	 * он не знает, в какое гнездо его выпускать.
+	 */
+	ret = rtl819x_intsw_zapis_vlan(RTL_NASH_VID, RTL_LAN_PORTY, 0x11E, 0);
 	if (ret)
 		return;
 
 	/*
-	 * Номер группы по умолчанию для КАЖДОГО порта, включая нулевой.
-	 * Без этого кадры, приходящие от 8367D в порт 0, получали чужой
-	 * номер 8, оставшийся от загрузчика, и до процессора не доходили:
-	 * группы 8 в таблице нет вовсе.
+	 * Номер группы по умолчанию. Порты 1..4 и процессор 8 - LAN (9).
+	 *
+	 * Порт 0 - НЕ LAN, а транк: на нём PVID 8 (WAN). Так кадр без метки,
+	 * пришедший от 8367RB, попадает в WAN, а не в LAN. Метки 9 и 8 при
+	 * этом разбираются по таблице VLAN, PVID их не трогает.
+	 *
+	 * Прошлый опыт в ОЗУ: с PVID 9 на порту 0 кадры WAN без метки уходили
+	 * в LAN, и br-lan получал адрес провайдера.
 	 */
-	for (port = 0; port <= 4; port++)
+	for (port = 1; port <= 4; port++)
 		rtl819x_intsw_pvid(port, RTL_NASH_VID);
 	rtl819x_intsw_pvid(8, RTL_NASH_VID);
+	rtl819x_intsw_pvid(0, RTL_WAN_VID);
 
-	pr_info("rtl819x-sw: VLAN %u = ports 1-4 and 8, mask %03x\n",
-		RTL_NASH_VID, RTL_LAN_PORTY);
+	pr_info("rtl819x-sw: VLAN %u = ports 1-4,8 untagged, port 0 tagged\n",
+		RTL_NASH_VID);
 
 	/*
-	 * Группа 8 - WAN (v6.4). Внешний RTL8367D метит кадры
-	 * синего гнезда номером 8 (LAN - номером 9) и отдаёт их сюда, в порт 0.
+	 * Группа 8 - WAN. Внешний RTL8367RB метит кадры синего гнезда
+	 * номером 8 (LAN - номером 9) и отдаёт их сюда, в порт 0.
 	 * Без этой строки таблицы внутренний коммутатор кадры с меткой 8
 	 * выбрасывает: проверено в ОЗУ, eth0.8 молчал, пока группы не было.
-	 * Члены - порт 0 и процессор 8, FID 1, чтобы MAC из WAN не путались с LAN.
+	 * Члены - порт 0 и процессор 8, FID 1, чтобы MAC из WAN не путались
+	 * с LAN. Тег НЕ снимаем ни на одном из них: на порту 0 он нужен
+	 * внешнему свитчу, а на процессоре - драйверу (eth0.8).
 	 */
-	ret = rtl819x_intsw_zapis_vlan(RTL_WAN_VID, 0x101, 0x101, 1);
+	ret = rtl819x_intsw_zapis_vlan(RTL_WAN_VID, 0x101, 0x000, 1);
 	pr_info("rtl819x-sw: VLAN %u (WAN) = port 0 and 8, FID 1, result %d\n",
 		RTL_WAN_VID, ret);
 	pr_info("rtl819x-sw: PVCR0=%08x PVCR1=%08x PVCR2=%08x PVCR4=%08x\n",

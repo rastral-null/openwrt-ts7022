@@ -1,0 +1,22 @@
+MIPS: экспортируем DMA-cache операции для модулей
+
+Вендорский драйвер rtl8192fe (модуль rtl8192cd.ko) вызывает
+_dma_cache_wback_inv/_dma_cache_wback/_dma_cache_inv напрямую. В ядре 6.x
+это не функции, а указатели на платформенные реализации из
+arch/mips/mm/cache.c, и они не экспортировались - modpost падал с
+"undefined!" и сборка модуля не проходила.
+
+Драйвер под GPL-2.0 (MODULE_LICENSE("GPL")), поэтому экспорт GPL.
+
+--- a/arch/mips/mm/cache.c
++++ b/arch/mips/mm/cache.c
+@@ -79,6 +79,9 @@
+ /* DMA cache operations. */
+ void (*_dma_cache_wback_inv)(unsigned long start, unsigned long size);
+ void (*_dma_cache_wback)(unsigned long start, unsigned long size);
+ void (*_dma_cache_inv)(unsigned long start, unsigned long size);
++EXPORT_SYMBOL_GPL(_dma_cache_wback_inv);
++EXPORT_SYMBOL_GPL(_dma_cache_wback);
++EXPORT_SYMBOL_GPL(_dma_cache_inv);
+ 
+ #endif /* CONFIG_DMA_NONCOHERENT */
