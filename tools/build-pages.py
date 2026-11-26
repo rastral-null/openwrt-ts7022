@@ -37,7 +37,7 @@ TEMPLATE = """<!doctype html>
 <main>
 {body}
 </main>
-<footer>© Elengal · GPL-2.0 · <a href="https://github.com/Elengal/openwrt-rx23302">GitHub</a></footer>
+<footer>OpenWrt для TRANSERV TS-7022 (форк openwrt-rx23302) · GPL-2.0 · <a href="https://github.com/rastral-null/openwrt-ts7022">GitHub</a></footer>
 </div>
 </body>
 </html>
@@ -86,7 +86,7 @@ def convert(name: str) -> None:
     # ссылки на markdown -> html
     body = re.sub(r'(href="[^"]*?)\.md(#[^"]*)?"', r'\1.html\2"', body)
     m = re.search(r'<h1[^>]*>(.*?)</h1>', body)
-    title = re.sub(r'<[^>]+>', '', m.group(1)) if m else 'OpenWrt для RX-23302'
+    title = re.sub(r'<[^>]+>', '', m.group(1)) if m else 'OpenWrt для TS-7022'
     nav = ' · '.join(
         f'<a href="{href}.html">{label}</a>' for href, label in NAV
     )

@@ -13,37 +13,45 @@
 <h1 id="uart-reset-tftp-installing-without-uart-reset-tftp">Установка без UART: кнопка Reset + TFTP / Installing without UART: Reset + TFTP</h1>
 <blockquote>
 <p><strong>RU</strong> ниже, <strong>EN</strong> — в конце.</p>
-<p>Проверено на железе 21–22.10.2026: вход кнопкой Reset, приём файла, запись загрузчиком,
-загрузка OpenWrt; содержимое флеша сверено с образом по md5. От отправки файла до
-работающей OpenWrt — около 2 минут.</p>
-<p>⚠️ Только для <strong>Ротек RX-23302 с RTL8197FH-VG</strong> (заводская прошивка <code>ELECTRA-RX23302</code>,
-загрузчик <code>v3.4T-pre4.6</code>). Другие ревизии и двойники не проверялись — см. README.</p>
+<p>⚠️ <strong>Процедура унаследована от порта ELECTRA RX23302 и на TRANSERV TS-7022
+отдельно не проверялась.</strong> Имена файлов, подписи и смещения ниже приведены
+к TS-7022 по исходникам этого репозитория, но сам вход в TFTP-режим,
+адрес загрузчика и запись на живой TS-7022 не подтверждены. Если что-то
+пойдёт не так, используйте UART — <a href="install-uart.html">install-uart.md</a>.</p>
+<p>Образ TS-7022 при этом собран и проверен на железе: OpenWrt загружается.</p>
+<p>⚠️ Только для <strong>TRANSERV TS-7022 с RTL8197F-VG</strong> (загрузчик семейства
+<code>v3.4T-pre4.6</code>). Другие ревизии и двойники не проверялись — см. README.</p>
 </blockquote>
 <h2 id="_1">Как это работает</h2>
-<p>В заводском загрузчике (<code>Realtek RTL8197F-VG boot code … v3.4T-pre4.6</code>) есть аварийный режим.
-Если при включении питания <strong>зажата кнопка Reset</strong>, загрузчик не запускает прошивку, а поднимает
-TFTP-сервер на адресе <strong>192.168.1.6</strong>. Принятый файл он проверяет (подписи <code>KE32</code>/<code>RE32</code>, контрольные
-суммы), сам пишет во флеш и перезагружается. Разбирать корпус и паять не нужно.</p>
-<p>Файл для этого способа — <strong><code>openwrt-…-electra_rx23302-squashfs-tftp-factory.bin</code></strong>. Это тот же
-<code>full.bin</code>, только разложенный на два блока с заголовками, которые понимает загрузчик:
-ядро ложится с 0x30000, корневая система — с 0x300000. Во флеше получается то же самое, что
-после установки через UART.</p>
-<p><strong>Заводская прошивка во втором слоте (0x800000) не затирается</strong> — путь назад: <a href="recovery.html">recovery.md</a>.</p>
+<p>В заводском загрузчике Realtek есть аварийный режим. Если при включении питания
+<strong>зажата кнопка Reset</strong>, загрузчик не запускает прошивку, а поднимает TFTP-сервер
+на адресе <strong>192.168.1.6</strong>. Принятый файл он проверяет (подписи <code>KM70</code>/<code>RM70</code>,
+контрольные суммы), сам пишет во флеш и перезагружается. Разбирать корпус и паять
+не нужно.</p>
+<p>Файл для этого способа — <strong><code>openwrt-…-transerv_ts7022-squashfs-tftp-factory.bin</code></strong>.
+Это тот же <code>full.bin</code>, только разложенный на два блока с заголовками, которые
+понимает загрузчик: ядро ложится с 0x30000, корневая система — с 0x270000.
+Во флеше получается то же самое, что после установки через UART.</p>
+<p><strong>Заводская прошивка во втором банке (0x800000) не затирается</strong> — путь назад:
+<a href="recovery.html">recovery.md</a>.</p>
 <h2 id="_2">Что понадобится</h2>
 <ul>
-<li>Компьютер с проводом Ethernet и TFTP-клиентом (Linux: <code>tftp-hpa</code>, <code>atftp</code> или <code>busybox tftp</code>;
-  Windows: встроенный «Клиент TFTP» или tftpd64).</li>
+<li>Компьютер с проводом Ethernet и TFTP-клиентом (Linux: <code>tftp-hpa</code>, <code>atftp</code> или
+  <code>busybox tftp</code>; Windows: встроенный «Клиент TFTP» или tftpd64).</li>
 <li>Скрепка для кнопки Reset.</li>
 </ul>
 <h2 id="_3">Шаги</h2>
 <ol>
-<li>Компьютер — проводом в гнездо <strong>LAN</strong> роутера (не в WAN).</li>
-<li>На компьютере вручную задайте адрес <strong>192.168.1.10</strong>, маска <strong>255.255.255.0</strong>.</li>
-<li>Выключите роутер. <strong>Зажмите Reset</strong>, затем, <strong>не отпуская</strong>, включите питание. Держите ~10 секунд.
-   - Если до этого уже было включено, а вы зажали кнопку потом, — не сработает: загрузчик смотрит
-     на кнопку один раз, в первые секунды.</li>
-<li>Проверьте, что режим включился: <code>ping 192.168.1.6</code> <strong>не отвечает</strong> (так и должно быть), но
-   <code>arp -a</code> показывает адрес 192.168.1.6. Надёжнее всего — сразу пробовать шаг 5.</li>
+<li>Компьютер — проводом в одно из гнёзд <strong>LAN</strong> роутера (не в синий WAN).</li>
+<li>На компьютере вручную задайте адрес <strong>192.168.1.10</strong>, маска <strong>255.255.255.0</strong>.
+   Этот адрес не должен пересекаться с адресом LAN самой OpenWrt (192.168.1.1).</li>
+<li>Выключите роутер. <strong>Зажмите Reset</strong>, затем, <strong>не отпуская</strong>, включите питание.
+   Держите ~10 секунд.
+   - Если до этого уже было включено, а вы зажали кнопку потом, — не сработает:
+     загрузчик смотрит на кнопку один раз, в первые секунды.</li>
+<li>Проверьте, что режим включился: <code>ping 192.168.1.6</code> <strong>не отвечает</strong> (так и
+   должно быть), но <code>arp -a</code> показывает адрес 192.168.1.6. Надёжнее всего —
+   сразу пробовать шаг 5.</li>
 <li>Отправьте файл (двоичный режим):
    <code>sh
    # Linux, busybox:
@@ -52,45 +60,58 @@ TFTP-сервер на адресе <strong>192.168.1.6</strong>. Приняты
    tftp 192.168.1.6 -m binary -c put openwrt-…-tftp-factory.bin
    # Windows:
    tftp -i 192.168.1.6 PUT openwrt-…-tftp-factory.bin</code>
-   Передача — секунды. <strong>Не выключайте питание</strong> минимум 3 минуты: загрузчик пишет ядро, затем
-   корневую систему (<code>Flash Write Successed!</code> в логе UART, если он подключён) и сам перезагрузится.</li>
-<li>После перезагрузки — OpenWrt: 192.168.0.1, LuCI в браузере, Wi-Fi <code>RX23302</code> / <code>RX23302-5G</code>.</li>
-<li><strong>Раздел настроек TFTP не стирает.</strong> Если на роутере уже стояла OpenWrt — сбросьте настройки:
-   держите Reset 5+ секунд в работающей OpenWrt, или LuCI «Восстановить заводские», или
-   <code>firstboot -y &amp;&amp; reboot</code>. Если раньше была заводская прошивка — ничего делать не нужно.</li>
+   Передача — секунды. <strong>Не выключайте питание</strong> минимум 3 минуты: загрузчик
+   пишет ядро, затем корневую систему (в логе UART, если он подключён,
+   <code>Flash Write Successed!</code>) и сам перезагрузится.</li>
+<li>После перезагрузки — OpenWrt: <strong>192.168.1.1</strong>, LuCI в браузере, Wi-Fi
+   <code>TS-7022</code> / <code>TS-7022-5G</code>, пароль по умолчанию <code>1234567890</code> (смените).</li>
+<li><strong>Раздел настроек TFTP не стирает.</strong> Если на роутере уже стояла OpenWrt —
+   сбросьте настройки: держите Reset 5+ секунд в работающей OpenWrt, или LuCI
+   «Восстановить заводские», или <code>firstboot -y &amp;&amp; reboot</code>. Если раньше была
+   заводская прошивка — ничего делать не нужно.</li>
 </ol>
 <h2 id="-">Если что-то пошло не так</h2>
 <ul>
-<li>Загрузчик <strong>не трогает</strong> себя и заводские данные (0x0–0x30000), поэтому повторить шаги 3–5 можно
-  всегда. Если и это не помогает — <a href="install-uart.html">install-uart.md</a>.</li>
+<li>Загрузчик <strong>не трогает</strong> себя и заводские данные (0x0–0x30000), поэтому
+  повторить шаги 3–5 можно всегда. Если и это не помогает —
+  <a href="install-uart.html">install-uart.md</a>.</li>
 <li>Если в файле испорчена сумма, загрузчик ничего не пишет («checksum error»).</li>
-<li>Не дописывайте к файлу ничего своего: на хвост <code>\0mbukanov</code> загрузчик переписывает сектор заводских
-  данных 0x23000.</li>
+<li>Не дописывайте к файлу ничего своего: посторонний хвост может быть принят
+  за данные и испортить область заводских настроек.</li>
 </ul>
 <hr />
 <h2 id="english">English</h2>
 <blockquote>
-<p>Verified on hardware (2026-10-21/22): button entry, transfer, bootloader flashing and OpenWrt
-boot; flash contents checked against the image by md5. About 2 minutes from upload to a running
-OpenWrt. Rotek RX-23302 with RTL8197FH-VG (bootloader <code>v3.4T-pre4.6</code>) only.</p>
+<p>⚠️ <strong>This procedure is inherited from the ELECTRA RX23302 port and has not
+been separately verified on the TRANSERV TS-7022.</strong> Filenames, signatures and
+offsets below are adapted to the TS-7022 from this repository's sources, but
+entering TFTP mode, the loader address and flashing on a live TS-7022 are
+unconfirmed. If it does not work, use UART — see <a href="install-uart.html">install-uart.md</a>.
+The TS-7022 image itself has been built and booted on hardware.</p>
+<p>For <strong>TRANSERV TS-7022 with RTL8197F-VG</strong> only (loader family <code>v3.4T-pre4.6</code>).</p>
 </blockquote>
-<p>The stock bootloader (<code>v3.4T-pre4.6</code>) has a recovery mode: hold <strong>Reset while applying power</strong>
-(keep it ~10 s) and it starts a TFTP server at <strong>192.168.1.6</strong> instead of booting. It checks the
-received file (<code>KE32</code>/<code>RE32</code> signatures, checksums), writes it to flash and reboots. No disassembly,
-no soldering.</p>
-<p>Use <strong><code>openwrt-…-electra_rx23302-squashfs-tftp-factory.bin</code></strong> — the same content as <code>full.bin</code>
-split into two bootloader-understood blocks (kernel → 0x30000, rootfs → 0x300000). The stock
-firmware in the second bank (0x800000) is not touched — see <a href="recovery.html">recovery.md</a>.</p>
+<p>The stock bootloader has a recovery mode: hold <strong>Reset while applying power</strong>
+(keep it ~10 s) and it starts a TFTP server at <strong>192.168.1.6</strong> instead of booting.
+It checks the received file (<code>KM70</code>/<code>RM70</code> signatures, checksums), writes it to
+flash and reboots. No disassembly, no soldering.</p>
+<p>Use <strong><code>openwrt-…-transerv_ts7022-squashfs-tftp-factory.bin</code></strong> — the same content
+as <code>full.bin</code> split into two bootloader-understood blocks (kernel → 0x30000,
+rootfs → 0x270000). The stock firmware in the second bank (0x800000) is not
+touched — see <a href="recovery.html">recovery.md</a>.</p>
 <ol>
 <li>PC cable into a router <strong>LAN</strong> port; set PC address <strong>192.168.1.10/24</strong>.</li>
-<li>Power off, <strong>hold Reset, power on</strong>, keep holding ~10 s (pressing after power-on does not work).</li>
-<li><code>tftp -i 192.168.1.6 PUT openwrt-…-tftp-factory.bin</code> (binary mode). <code>ping</code> to .6 does not answer — expected.</li>
-<li>Do not cut power for at least 3 minutes; it reboots by itself into OpenWrt (192.168.0.1).</li>
-<li>TFTP does not erase the settings partition: if OpenWrt was installed before, factory-reset it
-   (hold Reset 5+ s, LuCI, or <code>firstboot -y &amp;&amp; reboot</code>).</li>
+<li>Power off, <strong>hold Reset, power on</strong>, keep holding ~10 s (pressing after
+   power-on does not work).</li>
+<li><code>tftp -i 192.168.1.6 PUT openwrt-…-tftp-factory.bin</code> (binary mode). <code>ping</code> to
+   .6 does not answer — expected.</li>
+<li>Do not cut power for at least 3 minutes; it reboots by itself into OpenWrt
+   (<strong>192.168.1.1</strong>), Wi-Fi <code>TS-7022</code> / <code>TS-7022-5G</code>, default password
+   <code>1234567890</code>.</li>
+<li>TFTP does not erase the settings partition: if OpenWrt was installed before,
+   factory-reset it (hold Reset 5+ s, LuCI, or <code>firstboot -y &amp;&amp; reboot</code>).</li>
 </ol>
 </main>
-<footer>© Elengal · GPL-2.0 · <a href="https://github.com/Elengal/openwrt-rx23302">GitHub</a></footer>
+<footer>OpenWrt для TRANSERV TS-7022 (форк openwrt-rx23302) · GPL-2.0 · <a href="https://github.com/rastral-null/openwrt-ts7022">GitHub</a></footer>
 </div>
 </body>
 </html>
