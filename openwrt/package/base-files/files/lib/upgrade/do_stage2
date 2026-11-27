@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+# Копия upstream-файла package/base-files/files/lib/upgrade/do_stage2 с правкой
+# для TS-7022/RTL8197F: перед reboot -f не делаем umount -a, потому что старый
+# корень (overlayfs поверх jffs2) намеренно остаётся смонтированным - см.
+# switch_to_ramfs в stage2. Upstream: OpenWrt
+# 82e2e4f492d58b5b6afaf5b55d8286c58da9c224 - при смене OPENWRT_COMMIT сверить
+# с оригиналом.
+
+. /lib/functions.sh
+
+include /lib/upgrade
+
+v "Performing system upgrade..."
+if type 'platform_do_upgrade' >/dev/null 2>/dev/null; then
+	platform_do_upgrade "$IMAGE"
+else
+	default_do_upgrade "$IMAGE"
+fi
+
+if [ -n "$UPGRADE_BACKUP" ] && type 'platform_copy_config' >/dev/null 2>/dev/null; then
+	platform_copy_config
+fi
+
+v "Upgrade completed"
+sleep 1
+
+v "Rebooting system..."
+reboot -f
+sleep 5
+echo b 2>/dev/null >/proc/sysrq-trigger

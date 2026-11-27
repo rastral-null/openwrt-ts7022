@@ -163,6 +163,11 @@ head -c &lt;число из вывода flash-uart-ts7022.py&gt; /dev/mtd2 | md
 </tbody>
 </table>
 <p>Гнёзда: <strong>синее = WAN</strong>, <strong>жёлтые = LAN1…LAN4</strong>.</p>
+<p><strong>Обновление.</strong> Дальше — LuCI или <code>sysupgrade</code> с
+<code>…-squashfs-sysupgrade.bin</code>. При переходе <strong>с v0.1</strong> сначала замените
+<code>/lib/upgrade/stage2</code> и <code>do_stage2</code>: в v0.1 старый корень размонтируется
+вместе с jffs2, и ядро падает в Oops до начала записи (флеш остаётся цел).
+Команды — в README, раздел «Обновление».</p>
 <hr />
 <h2 id="english">English</h2>
 <p><strong>Read first.</strong> For <strong>TRANSERV TS-7022 with RTL8197F-VG only</strong>; the procedure is
@@ -174,7 +179,11 @@ the case and use a <strong>3.3 V</strong> USB-UART adapter. Since <strong>v0.2</
 bank (0x800000) belongs to the overlay, so there is no stock copy on the device —
 the way back is TFTP/UART only, see <a href="recovery.html">recovery.md</a>. At
 your own risk. Later upgrades go through LuCI / <code>sysupgrade</code> with
-<code>…-squashfs-sysupgrade.bin</code>.</p>
+<code>…-squashfs-sysupgrade.bin</code>. Upgrading <strong>from v0.1</strong> needs one preparation
+step first: replace <code>/lib/upgrade/stage2</code> and <code>do_stage2</code>, otherwise the old
+root is unmounted together with jffs2 and the kernel oopses before writing
+anything (the flash stays intact). The commands are in the README, section
+«Обновление».</p>
 <p>There is also a simpler no-UART path (Reset + TFTP, also inherited):
 <a href="install-tftp.html">install-tftp.md</a>.</p>
 <p><strong>Serial:</strong> 38400 8N1, no flow control. Remove the cover: the UART is the

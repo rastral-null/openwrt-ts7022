@@ -26,7 +26,8 @@
 # 0x0..0x30000 и по логу загрузки), а единственное упоминание банка в
 # заводском логе печатает пользовательская утилита "dual boot utility".
 # С v0.2 второго банка нет и в разметке: 0x600000..0x1000000 отдан под
-# rootfs_data, поэтому platform_do_upgrade заодно стирает старые cfg/stock.
+# rootfs_data, поэтому старые cfg/stock оказываются внутри overlay; стирать
+# их по именам не нужно (на v0.1 они read-only) - см. platform_do_upgrade.
 #
 # sysupgrade for the RTL8197F boards. The image is full.bin plus fwtool
 # metadata. Order: erase kernel, write rootfs, write kernel last. An
@@ -129,28 +130,21 @@ platform_do_upgrade() {
 	mtd erase kernel || exit 1
 
 	# Настройки: rootfs_data - отдельный раздел, mtd write его не трогает.
-	# Стираем всегда и до записи ядра, иначе старый overlay перекроет
-	# новую систему.
-	v "Erasing rootfs_data..."
-	mtd erase rootfs_data || exit 1
-
 	v "Writing rootfs..."
 	dd if="$img" bs=4096 skip=$kblocks 2>/dev/null | mtd write - rootfs || exit 1
 
 	v "Writing kernel..."
 	dd if="$img" bs=4096 count=$kblocks 2>/dev/null | mtd write - kernel || exit 1
 
-	# v0.2: хвост флеша от 0x600000 отдан под rootfs_data. На системе v0.1
-	# там ещё живут разделы cfg (0x7A0000) и stock (0x800000) - стираем их
-	# последними, когда ядро уже записано: если питание пропадёт, банк 1
-	# останется годным, а негодной окажется только память под overlay.
-	if [ "$MODEL" = "transerv_ts7022" ]; then
-		for p in cfg stock; do
-			grep -q "\"$p\"" /proc/mtd || continue
-			v "Erasing $p (v0.2: отдан под rootfs_data)..."
-			mtd erase "$p" || exit 1
-		done
-	fi
+	# v0.2: хвост флеша от 0x600000 отдан под rootfs_data (10 МБ). Старую
+	# jffs2 (на v0.1 это 0x600000..0x7A0000) стираем последней, уже после
+	# ядра: свежую jffs2 создаст platform_copy_config, а бывшие cfg
+	# (0x7A0000) и stock (0x800000) остаются внутри нового раздела - их
+	# сотрёт сборщик мусора jffs2 при первой загрузке. По именам cfg/stock
+	# стирать нельзя: на v0.1 они помечены read-only (mtd flags 0x800, без
+	# MTD_WRITEABLE), mtd erase вернёт EACCES и оборвёт обновление.
+	v "Erasing rootfs_data..."
+	mtd erase rootfs_data || exit 1
 }
 
 # Сохранённые настройки кладём в чистый rootfs_data файлом sysupgrade.tgz;

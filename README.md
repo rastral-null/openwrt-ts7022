@@ -621,8 +621,35 @@ dual boot utility: linux_offset=0x30000, rootfs_offset=0x270000,
 `208ff9c2f7ade10506e11a0c380e869ad39f9497fb722b55d9aa358c7dd67fa7`.
 Порядок возврата — [docs/recovery.md](docs/recovery.md).
 
-`sysupgrade` сам стирает старые `cfg` и `stock` (в этом порядке, последними, когда
-ядро уже записано), поэтому отдельный шаг для перехода с v0.1 не нужен.
+### Обновление
+
+С v0.2 обновление идёт обычным путём: LuCI → «Обновление прошивки» или
+`sysupgrade -v /tmp/…-squashfs-sysupgrade.bin`. Флеш переразмечается на лету:
+`platform_do_upgrade` пишет rootfs, затем ядро и последним стирает
+`rootfs_data` — на v0.1 в него входят бывшие `cfg` и `stock`, поэтому стирать их
+по именам не нужно (на v0.1 они к тому же read-only). Overlay после обновления
+создаётся заново, настройки переносит штатный механизм `sysupgrade`
+(`/etc/sysupgrade.conf`, `/etc/config`).
+
+⚠️ **Переход с v0.1 требует одного подготовительного шага.** В v0.1
+`switch_to_ramfs` размонтирует старый корень (`umount -l /mnt`), пока overlayfs
+ещё держит inode jffs2, — ядро RTL8197F падает в Oops **до** начала записи.
+Флеш при этом остаётся цел, устройство просто перезагружается в v0.1. В v0.2
+teardown исправлен (старый корень остаётся смонтированным до `reboot -f`), но
+выполняется он из старой системы, поэтому один раз, ещё на v0.1, замените два
+файла — те же, что уже лежат в образе v0.2:
+
+```sh
+cd /tmp
+wget -O stage2    https://raw.githubusercontent.com/rastral-null/openwrt-ts7022/main/openwrt/package/base-files/files/lib/upgrade/stage2
+wget -O do_stage2 https://raw.githubusercontent.com/rastral-null/openwrt-ts7022/main/openwrt/package/base-files/files/lib/upgrade/do_stage2
+cp stage2 do_stage2 /lib/upgrade/ && chmod 755 /lib/upgrade/stage2
+sysupgrade -v /tmp/…-squashfs-sysupgrade.bin
+```
+
+Если у роутера нет выхода в интернет — скопируйте эти два файла с компьютера:
+`scp stage2 do_stage2 root@192.168.1.1:/lib/upgrade/`. Дальше обновления идут
+без подготовки: исправленные файлы уже в системе.
 
 ### Откуда код
 

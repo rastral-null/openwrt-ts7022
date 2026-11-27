@@ -134,6 +134,12 @@ sync; reboot
 
 Гнёзда: **синее = WAN**, **жёлтые = LAN1…LAN4**.
 
+**Обновление.** Дальше — LuCI или `sysupgrade` с
+`…-squashfs-sysupgrade.bin`. При переходе **с v0.1** сначала замените
+`/lib/upgrade/stage2` и `do_stage2`: в v0.1 старый корень размонтируется вместе
+с jffs2, и ядро падает в Oops до начала записи (флеш остаётся цел). Команды —
+в README, раздел «Обновление».
+
 ---
 
 ## English
@@ -147,7 +153,10 @@ the case and use a **3.3 V** USB-UART adapter. Since **v0.2** the second flash
 bank (0x800000) belongs to the overlay, so there is no stock copy on the device —
 the way back is TFTP/UART only, see [recovery.md](recovery.md). At
 your own risk. Later upgrades go through LuCI / `sysupgrade` with
-`…-squashfs-sysupgrade.bin`.
+`…-squashfs-sysupgrade.bin`. Upgrading **from v0.1** needs one preparation step
+first: replace `/lib/upgrade/stage2` and `do_stage2`, otherwise the old root is
+unmounted together with jffs2 and the kernel oopses before writing anything
+(the flash stays intact). The commands are in the README, section «Обновление».
 
 There is also a simpler no-UART path (Reset + TFTP, also inherited):
 [install-tftp.md](install-tftp.md).
