@@ -2,6 +2,9 @@
 
 <img width="500" height="474" alt="image" src="https://github.com/user-attachments/assets/b9a595e1-5ef5-4620-af26-ce6fa264cae6" />
 
+<img width="1478" height="973" alt="image" src="https://github.com/user-attachments/assets/f8eb9cf5-34e7-4d91-8030-6ccf4549edec" />
+
+
 ### Характеристики
 
 | Компонент | Характеристика |
