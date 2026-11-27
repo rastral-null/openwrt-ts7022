@@ -19,8 +19,8 @@
   `…-squashfs-sysupgrade.bin`, см. README).
 - Нужен разбор корпуса и USB-UART адаптер **3,3 В**. Адаптер на 5 В может сжечь SoC.
 - Вы делаете это на свой риск. Гарантия на устройство пропадёт.
-- Заводская прошивка во **втором банке флеша (0x800000) не затирается** — путь
-  назад есть, см. [recovery.md](recovery.md).
+- С **v0.2** второй банк флеша (0x800000) отдан под overlay: заводской копии на
+  устройстве нет, возврат на сток — только TFTP/UART, см. [recovery.md](recovery.md).
 
 ## Что понадобится
 
@@ -143,8 +143,9 @@ inherited from the RX23302 port and has not been separately verified on the
 TS-7022, though the TS-7022 image has been built and booted on hardware. Before
 flashing, the UART boot log must start with `Realtek RTL8197F-VG boot code …`.
 Installing through the stock web UI has **not** been verified. You need to open
-the case and use a **3.3 V** USB-UART adapter. The stock firmware in the **second
-flash bank (0x800000) is not overwritten**, see [recovery.md](recovery.md). At
+the case and use a **3.3 V** USB-UART adapter. Since **v0.2** the second flash
+bank (0x800000) belongs to the overlay, so there is no stock copy on the device —
+the way back is TFTP/UART only, see [recovery.md](recovery.md). At
 your own risk. Later upgrades go through LuCI / `sysupgrade` with
 `…-squashfs-sysupgrade.bin`.
 

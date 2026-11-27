@@ -13,18 +13,28 @@
 #   TS-7022  KM70       0x240000          0x270000
 #
 # Порядок записи выбран так, чтобы прерванное обновление (выключили свет)
-# не превращало роутер в кирпич:
+# не оставляло "новое ядро со старым rootfs":
 #   1. стереть kernel - с этой секунды набор 1 для загрузчика негоден;
 #   2. записать rootfs;
 #   3. записать kernel - последним.
-# Если запись оборвётся на шагах 1-3, загрузчик не найдёт годного ядра,
-# скопирует заводскую прошивку из второго банка и загрузит её. Старое ядро
-# с новым rootfs (или наоборот) не загрузится никогда.
+# Если запись оборвётся на шагах 1-3, годного ядра не останется и устройство
+# поднимают по TFTP или UART (docs/install-tftp.md, docs/install-uart.md).
+# Старое ядро с новым rootfs (или наоборот) не загрузится никогда.
+#
+# Копирования второго банка поверх первого на TS-7022 НЕТ: в bootcode этой
+# платы нет строк "Checking bank2"/"Copy bank2" (проверено по дампу
+# 0x0..0x30000 и по логу загрузки), а единственное упоминание банка в
+# заводском логе печатает пользовательская утилита "dual boot utility".
+# С v0.2 второго банка нет и в разметке: 0x600000..0x1000000 отдан под
+# rootfs_data, поэтому platform_do_upgrade заодно стирает старые cfg/stock.
 #
 # sysupgrade for the RTL8197F boards. The image is full.bin plus fwtool
-# metadata. Order: erase kernel, write rootfs, write kernel last - an
-# interrupted upgrade leaves no valid kernel, and the bootloader restores the
-# stock firmware from bank 2 instead of booting a mismatched kernel/rootfs.
+# metadata. Order: erase kernel, write rootfs, write kernel last. An
+# interrupted upgrade leaves no valid kernel and the board is recovered over
+# TFTP/UART - the TS-7022 bootcode does not copy bank 2 over bank 1 (no such
+# strings in its bootcode, none in the boot log; only the stock userspace
+# "dual boot utility" mentions banks). Since v0.2 there is no bank 2 in the
+# layout at all: 0x600000..0x1000000 belongs to rootfs_data.
 
 REQUIRE_IMAGE_METADATA=1
 
@@ -115,7 +125,7 @@ platform_do_upgrade() {
 	sync
 	echo 3 > /proc/sys/vm/drop_caches
 
-	v "Invalidating kernel (interrupted upgrade -> bootloader restores stock)..."
+	v "Invalidating kernel (interrupted upgrade -> recover over TFTP/UART)..."
 	mtd erase kernel || exit 1
 
 	# Настройки: rootfs_data - отдельный раздел, mtd write его не трогает.
@@ -129,6 +139,18 @@ platform_do_upgrade() {
 
 	v "Writing kernel..."
 	dd if="$img" bs=4096 count=$kblocks 2>/dev/null | mtd write - kernel || exit 1
+
+	# v0.2: хвост флеша от 0x600000 отдан под rootfs_data. На системе v0.1
+	# там ещё живут разделы cfg (0x7A0000) и stock (0x800000) - стираем их
+	# последними, когда ядро уже записано: если питание пропадёт, банк 1
+	# останется годным, а негодной окажется только память под overlay.
+	if [ "$MODEL" = "transerv_ts7022" ]; then
+		for p in cfg stock; do
+			grep -q "\"$p\"" /proc/mtd || continue
+			v "Erasing $p (v0.2: отдан под rootfs_data)..."
+			mtd erase "$p" || exit 1
+		done
+	fi
 }
 
 # Сохранённые настройки кладём в чистый rootfs_data файлом sysupgrade.tgz;

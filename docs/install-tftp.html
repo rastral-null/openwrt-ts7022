@@ -32,8 +32,9 @@
 Это тот же <code>full.bin</code>, только разложенный на два блока с заголовками, которые
 понимает загрузчик: ядро ложится с 0x30000, корневая система — с 0x270000.
 Во флеше получается то же самое, что после установки через UART.</p>
-<p><strong>Заводская прошивка во втором банке (0x800000) не затирается</strong> — путь назад:
-<a href="recovery.html">recovery.md</a>.</p>
+<p><strong>Начиная с v0.2 второй банк (0x800000) отдан под overlay</strong> — заводской копии
+на устройстве больше нет, путь назад только через TFTP (эта страница) или UART,
+см. <a href="recovery.html">recovery.md</a>.</p>
 <h2 id="_2">Что понадобится</h2>
 <ul>
 <li>Компьютер с проводом Ethernet и TFTP-клиентом (Linux: <code>tftp-hpa</code>, <code>atftp</code> или
@@ -96,8 +97,9 @@ It checks the received file (<code>KM70</code>/<code>RM70</code> signatures, che
 flash and reboots. No disassembly, no soldering.</p>
 <p>Use <strong><code>openwrt-…-transerv_ts7022-squashfs-tftp-factory.bin</code></strong> — the same content
 as <code>full.bin</code> split into two bootloader-understood blocks (kernel → 0x30000,
-rootfs → 0x270000). The stock firmware in the second bank (0x800000) is not
-touched — see <a href="recovery.html">recovery.md</a>.</p>
+rootfs → 0x270000). Since <strong>v0.2</strong> the second bank (0x800000) belongs to the
+overlay — there is no stock copy on the device any more, so the way back is TFTP
+or UART only, see <a href="recovery.html">recovery.md</a>.</p>
 <ol>
 <li>PC cable into a router <strong>LAN</strong> port; set PC address <strong>192.168.1.10/24</strong>.</li>
 <li>Power off, <strong>hold Reset, power on</strong>, keep holding ~10 s (pressing after

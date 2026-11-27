@@ -14,11 +14,12 @@
 <blockquote>
 <p><strong>RU</strong> ниже, <strong>EN</strong> — в конце.</p>
 <p>⚠️ <strong>Процедуры возврата на сток унаследованы от порта ELECTRA RX23302 и на
-TRANSERV TS-7022 отдельно не проверялись.</strong> Сама разметка флеша ниже взята из
-реального лога загрузки TS-7022 (см. README), но копирование банков и команда
-возврата на сток проверены только на RX23302. Заводская копия во втором банке
-прошивкой OpenWrt не затирается — путь назад есть, но считайте его вероятным,
-а не гарантированным.</p>
+TRANSERV TS-7022 отдельно не проверялись.</strong> Разметка флеша ниже взята из
+реального лога загрузки TS-7022 (см. README). Копирования второго банка поверх
+первого на TS-7022 <strong>нет</strong>: в bootcode этой платы нет строк <code>Checking bank2</code> и
+<code>Copy bank2</code>, нет их и в логе загрузки. Поэтому «загрузчик сам восстановит
+заводскую прошивку» здесь не работает, а с <strong>v0.2</strong> второго банка нет и в
+разметке — он отдан под overlay.</p>
 </blockquote>
 <h2 id="16-xm25qh128c">Разметка флеша (16 МБ, XM25QH128C)</h2>
 <p>Данные из реального лога загрузки TS-7022 (<code>/proc/mtd</code>):</p>
@@ -54,31 +55,44 @@ TRANSERV TS-7022 отдельно не проверялись.</strong> Сама
 <td>0x600000</td>
 <td>0x1A0000</td>
 <td>rootfs_data</td>
-<td>настройки OpenWrt (overlay)</td>
+<td>настройки OpenWrt (overlay), <strong>v0.1</strong></td>
 </tr>
 <tr>
 <td>0x7A0000</td>
 <td>0x060000</td>
 <td>cfg</td>
-<td>раздел настроек заводской прошивки, только чтение</td>
+<td>настройки заводской прошивки, только чтение, <strong>v0.1</strong></td>
 </tr>
 <tr>
 <td>0x800000</td>
 <td>0x800000</td>
 <td>stock</td>
-<td><strong>банк 2: заводская прошивка, OpenWrt его не трогает</strong></td>
+<td>банк 2: заводская копия, <strong>v0.1</strong></td>
+</tr>
+<tr>
+<td>0x600000</td>
+<td>0xA00000</td>
+<td>rootfs_data</td>
+<td><strong>v0.2: overlay 10 МБ</strong> — <code>cfg</code> и банк 2 отданы под него</td>
 </tr>
 </tbody>
 </table>
 <p>Отличие от RX23302: у TS-7022 ядро занимает <code>0x30000..0x270000</code>, а корневая
 система начинается с <code>0x270000</code> (у RX23302 — <code>0x2d0000</code>/<code>0x300000</code>), и подпись
 ядра — <code>KM70</code>, а не <code>KE32</code>.</p>
-<p>Заводская прошивка — dual-image: два банка по 8 МБ. OpenWrt пишется только в
-банк 1, заводская копия в банке 2 (с <code>0x800000</code>) остаётся нетронутой.</p>
+<p>Заводская прошивка TS-7022 — dual-image: два банка по 8 МБ. На <strong>v0.1</strong> OpenWrt
+писался только в банк 1, а копия в банке 2 (с <code>0x800000</code>) оставалась нетронутой.
+На <strong>v0.2</strong> банк 2 и раздел <code>cfg</code> отданы под overlay: 1,7 МБ на настройки было
+мало, а загрузчик TS-7022 банк 2 всё равно не восстанавливает (см. ниже).
+Копию банка 1 в банк 2 на заводской прошивке делает утилита <code>dual boot utility</code>
+из userspace — это не механизм восстановления, а подготовка к OTA.</p>
+<p><strong>Перед переходом на v0.2 сохраните полный дамп флеша (16 МБ).</strong> После v0.2
+заводской копии на устройстве нет, и путь назад — только TFTP/UART с этим дампом.</p>
 <h2 id="_1">Как загрузчик защищает от кирпича</h2>
-<p>При каждом включении загрузчик проверяет банк 1 (заголовок ядра и сумму rootfs).
-Если банк 1 негоден, он <strong>сам копирует банк 2 в банк 1</strong> и загружает заводскую
-прошивку:</p>
+<p>⚠️ Этот раздел — про <strong>ELECTRA RX23302</strong>. У TS-7022 такого механизма нет:
+в его bootcode (дамп <code>0x0..0x30000</code>) нет строк <code>Checking bank2</code> / <code>Copy bank2</code>
+и в логе загрузки они не появляются. Ниже — как это выглядит на RX23302,
+для сравнения:</p>
 <pre><code>Checking bank2...
 Flash read from 00830000 to 80800000 with 007D0000 bytes ?
 Flash Program from 80800000 to 00030000 with 007D0000 bytes ?
@@ -86,25 +100,41 @@ Copy bank2 to bank1 successfully!
 Jump to image start=0x80a00000...
 Linux version 3.10.90-pre5 (abudeev@honor) ...
 </code></pre>
-<p><em>(лог с RX23302, 20.10.2026; на TS-7022 смещения банка 2 и подпись ядра могут
-отличаться — см. предупреждение выше)</em></p>
-<p>Поэтому:
-- оборванная прошивка (выключили свет во время sysupgrade) — роутер поднимется
-  на <strong>заводской</strong> прошивке, а не превратится в кирпич;
-- возврат на сток делается одной командой (ниже).</p>
-<h2 id="rx23302-20102026-ts-7022">Вернуть заводскую прошивку (проверено на RX23302 20.10.2026; на TS-7022 — нет)</h2>
+<p><em>(лог с RX23302, 20.10.2026)</em></p>
+<p>Поэтому на TS-7022:</p>
+<ul>
+<li>оборванная прошивка (выключили свет во время sysupgrade) <strong>не</strong> поднимется
+  сама на заводской прошивке — устройство придётся поднимать по TFTP или UART;</li>
+<li>на v0.1 «вернуть сток» ещё можно было одной командой (ниже), на v0.2 — только
+  прошивкой дампа через загрузчик.</li>
+</ul>
+<h2 id="_2">Вернуть заводскую прошивку</h2>
+<h3 id="v0-2-tftp-uart">v0.2 и новее: только TFTP/UART</h3>
+<p>Заводской копии в банке 2 больше нет. Порядок:</p>
+<ol>
+<li>Полный дамп флеша, снятый до установки OpenWrt (16 МБ, sha256
+   <code>208ff9c2f7ade10506e11a0c380e869ad39f9497fb722b55d9aa358c7dd67fa7</code>).
+   Из него нужен кусок <code>0x30000..0x800000</code> — это ровно банк 1 заводской прошивки
+   в том же виде, в каком его принимает <code>tools/flash-uart-ts7022.py</code>
+   (ядро с <code>0x30000</code>, rootfs с <code>0x270000</code>).</li>
+<li>Загнать этот кусок по UART тем же скриптом (или через TFTP, если поднимется
+   аварийный загрузчик: Reset при включении).</li>
+<li>После загрузки стока — сброс кнопкой Reset, чтобы заводская прошивка
+   разложила свои настройки (раздел <code>cfg</code> к этому моменту стёрт).</li>
+</ol>
+<h3 id="v0-1-mtd-erase-kernel-reboot-ts-7022">v0.1: <code>mtd erase kernel &amp;&amp; reboot</code> (на TS-7022 не проверялось)</h3>
 <p>Из OpenWrt (SSH или UART):</p>
 <pre><code class="language-sh">mtd erase kernel &amp;&amp; reboot
 </code></pre>
-<p>Загрузчик не найдёт ядра в банке 1, скопирует заводскую прошивку из банка 2 и
-загрузит её (копирование ~1–2 мин, потом обычная загрузка стока). UART для этого
-<strong>не нужен</strong>.</p>
+<p>На RX23302 загрузчик после этого копировал заводскую прошивку из банка 2 в банк 1
+и грузил её (~1–2 мин). <strong>На TS-7022 копирования банка нет</strong> — команда оставит
+устройство без ядра, и поднимать его придётся по TFTP/UART.</p>
 <p>Проверено на RX23302: после возврата банк 1 побайтно совпадал с заводским дампом
-флеша, загрузчик и заводские настройки платы не тронуты. На TS-7022 эта команда
-отдельно не проверялась.</p>
+флеша, загрузчик и заводские настройки платы не тронуты.</p>
 <blockquote>
-<p>Заводская прошивка поднимет свои заводские настройки (раздел <code>cfg</code> OpenWrt не
-трогает). Хотите вернуть ещё и их — сделайте сброс кнопкой Reset на стоке.</p>
+<p>На v0.1 заводская прошивка поднималась со своими настройками (раздел <code>cfg</code>
+OpenWrt не трогал). На v0.2 <code>cfg</code> стёрт — после возврата на сток сделайте сброс
+кнопкой Reset, чтобы прошивка разложила настройки заново.</p>
 </blockquote>
 <h2 id="openwrt">Если OpenWrt не загружается</h2>
 <p><strong>Без разборки:</strong> выключите роутер, зажмите Reset, включите питание, держите ~10 с —
@@ -129,28 +159,31 @@ Linux version 3.10.90-pre5 (abudeev@honor) ...
 <blockquote>
 <p>⚠️ <strong>The recovery procedures are inherited from the ELECTRA RX23302 port and
 have not been separately verified on the TRANSERV TS-7022.</strong> The flash layout
-below comes from a real TS-7022 boot log (see README), but the bank copy and the
-return-to-stock command were only verified on the RX23302. The stock copy in the
-second bank is not written by OpenWrt — there is a way back, but treat it as
-likely, not guaranteed.</p>
+comes from a real TS-7022 boot log (see README). The TS-7022 bootcode does <strong>not</strong>
+copy bank 2 over bank 1 (no <code>Checking bank2</code>/<code>Copy bank2</code> strings in its bootcode,
+none in the boot log), and since <strong>v0.2</strong> there is no bank 2 in the layout at all:
+it was given to the overlay.</p>
 </blockquote>
 <p><strong>Flash layout (16 MB):</strong> see the table above. TS-7022 kernel occupies
 <code>0x30000..0x270000</code>, rootfs starts at <code>0x270000</code> (RX23302 used
-<code>0x2d0000</code>/<code>0x300000</code>), and the kernel signature is <code>KM70</code>, not <code>KE32</code>. OpenWrt
-lives in bank 1; the <strong>stock firmware in bank 2 (from 0x800000) is never written</strong>.
-The bootloader (0x0–0x30000) is never written.</p>
-<p><strong>Brick protection:</strong> on every boot the bootloader validates bank 1 (kernel header
-and rootfs checksum). If bank 1 is invalid it <strong>copies bank 2 over bank 1 by
-itself</strong> and boots the stock firmware (<code>Copy bank2 to bank1 successfully!</code>, real
-log above — from RX23302). An interrupted sysupgrade therefore ends in stock
-firmware, not a brick.</p>
-<p><strong>Return to stock (verified on RX23302 2026-10-20, not verified on TS-7022):</strong> from
-OpenWrt run</p>
-<pre><code class="language-sh">mtd erase kernel &amp;&amp; reboot
-</code></pre>
-<p>The bootloader restores the stock firmware from bank 2 (~1–2 min) and boots it. No
-UART needed. On the RX23302, after the restore bank 1 matched the original stock
-flash dump byte for byte.</p>
+<code>0x2d0000</code>/<code>0x300000</code>), and the kernel signature is <code>KM70</code>, not <code>KE32</code>. On v0.1
+OpenWrt lived in bank 1 and the stock copy in bank 2 (from <code>0x800000</code>) was never
+written. Since <strong>v0.2</strong> <code>rootfs_data</code> covers <code>0x600000..0x1000000</code> (10 MB overlay)
+and the old <code>cfg</code>/bank-2 regions are erased by sysupgrade. The bootloader
+(0x0–0x30000) is never written.</p>
+<p><strong>Brick protection:</strong> this is an <strong>RX23302</strong> feature, not a TS-7022 one. On the
+RX23302 the bootloader validates bank 1 on every boot and, if it is invalid,
+<strong>copies bank 2 over bank 1 by itself</strong> and boots the stock firmware
+(<code>Copy bank2 to bank1 successfully!</code>). The TS-7022 bootcode has no such code, so an
+interrupted sysupgrade leaves the board without a kernel and it must be recovered
+over TFTP or UART.</p>
+<p><strong>Return to stock (v0.2 and newer):</strong> only over TFTP/UART. Keep the full 16 MB flash
+dump taken before installing OpenWrt (sha256
+<code>208ff9c2f7ade10506e11a0c380e869ad39f9497fb722b55d9aa358c7dd67fa7</code>); its
+<code>0x30000..0x800000</code> slice is the stock bank 1 in the layout <code>tools/flash-uart-ts7022.py</code>
+expects. On v0.1 <code>mtd erase kernel &amp;&amp; reboot</code> still worked on the RX23302 (the
+bootloader restored bank 2), but on the TS-7022 it only leaves the board without a
+kernel.</p>
 <p><strong>OpenWrt does not boot:</strong> hold Reset while powering on (~10 s) and send
 <code>…-squashfs-tftp-factory.bin</code> to 192.168.1.6 over TFTP (<a href="install-tftp.html">install-tftp.md</a>); no case
 opening needed. Fallback: UART, Esc until <code>&lt;RealTek&gt;</code>, <code>tools/flash-uart-ts7022.py</code>

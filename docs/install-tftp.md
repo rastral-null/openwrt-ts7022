@@ -26,8 +26,9 @@
 понимает загрузчик: ядро ложится с 0x30000, корневая система — с 0x270000.
 Во флеше получается то же самое, что после установки через UART.
 
-**Заводская прошивка во втором банке (0x800000) не затирается** — путь назад:
-[recovery.md](recovery.md).
+**Начиная с v0.2 второй банк (0x800000) отдан под overlay** — заводской копии
+на устройстве больше нет, путь назад только через TFTP (эта страница) или UART,
+см. [recovery.md](recovery.md).
 
 ## Что понадобится
 
@@ -95,8 +96,9 @@ flash and reboots. No disassembly, no soldering.
 
 Use **`openwrt-…-transerv_ts7022-squashfs-tftp-factory.bin`** — the same content
 as `full.bin` split into two bootloader-understood blocks (kernel → 0x30000,
-rootfs → 0x270000). The stock firmware in the second bank (0x800000) is not
-touched — see [recovery.md](recovery.md).
+rootfs → 0x270000). Since **v0.2** the second bank (0x800000) belongs to the
+overlay — there is no stock copy on the device any more, so the way back is TFTP
+or UART only, see [recovery.md](recovery.md).
 
 1. PC cable into a router **LAN** port; set PC address **192.168.1.10/24**.
 2. Power off, **hold Reset, power on**, keep holding ~10 s (pressing after
