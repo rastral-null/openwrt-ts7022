@@ -625,6 +625,54 @@ dual boot utility: linux_offset=0x30000, rootfs_offset=0x270000,
 `208ff9c2f7ade10506e11a0c380e869ad39f9497fb722b55d9aa358c7dd67fa7`.
 Порядок возврата — [docs/recovery.md](docs/recovery.md).
 
+### v0.3: ZRAM и тема Footstrap
+
+**ZRAM** — сжатый swap в ОЗУ. На 128 МБ без свопа тяжёлые сценарии (обновление
+списков пакетов, применение настроек в LuCI) упираются в память. В образе
+`kmod-zram` и `zram-swap`, устройство поднимается на `S15zram`:
+
+| Параметр | По умолчанию |
+|---|---|
+| Размер устройства | `MemTotal/2048` = **≈61 МБ** при 128 МБ ОЗУ |
+| Алгоритм | `lzo-rle` |
+| Приоритет | 100 |
+
+Настройка — в `/etc/config/system`, раздел `system`:
+
+```sh
+uci set system.@system[0].zram_size_mb=32    # МБ; по умолчанию RAM/2048
+uci set system.@system[0].zram_comp_algo=lzo
+uci commit system && /etc/init.d/zram restart
+```
+
+Проверка: `swapon -s` или `/etc/init.d/zram status`. В ядре для этого включён
+`CONFIG_SWAP` — у цели rtl819x он по умолчанию выключен (`SMALL_FLASH`).
+
+**Тема LuCI Footstrap** в образ **не входит**: раздел rootfs — 3,73 МБ, к v0.2 он
+занят на 98% (свободно ~55 КБ), а тема добавляет ~209 КБ в squashfs. Она
+собирается вместе с образом и лежит в релизе отдельными пакетами:
+
+- `luci-theme-footstrap-*.apk` (~98 КБ);
+- `luci-i18n-footstrap-ru-*.apk` — русская локализация темы.
+
+Установка на устройство (overlay 10 МБ, распакованная тема занимает ~340 КБ):
+
+```sh
+cd /tmp
+wget -O footstrap.apk    https://github.com/rastral-null/openwrt-ts7022/releases/download/0.3/luci-theme-footstrap-<версия>.apk
+wget -O footstrap-ru.apk https://github.com/rastral-null/openwrt-ts7022/releases/download/0.3/luci-i18n-footstrap-ru-<версия>.apk
+apk add --allow-untrusted --force-non-repository footstrap.apk footstrap-ru.apk
+```
+
+`--force-non-repository` нужен потому, что apk 3 отказывается ставить пакет,
+которого нет ни в одном настроенном репозитории: `You tried to add a
+non-repository package to system`.
+
+Тема регистрируется сама (uci-defaults) и сразу становится активной; вернуться на
+Bootstrap можно в «Система → Язык и оформление». После sysupgrade тему нужно
+поставить заново: пакеты из overlay при обновлении не переносятся, переезжают
+только настройки.
+
 ### Обновление
 
 С v0.2 обновление идёт обычным путём: LuCI → «Обновление прошивки» или
@@ -1288,6 +1336,55 @@ TFTP or UART. Full flash dump (16 MB) before installation:
 `ts7022-mainline/backup/wholeflash.bin`, sha256
 `208ff9c2f7ade10506e11a0c380e869ad39f9497fb722b55d9aa358c7dd67fa7`.
 The recovery procedure is described in [docs/recovery.md](docs/recovery.md).
+
+### v0.3: ZRAM and the Footstrap theme
+
+**ZRAM** is a compressed swap in RAM. With 128 MB and no swap, heavy scenarios
+(refreshing package lists, applying settings in LuCI) hit the memory ceiling.
+The image ships `kmod-zram` and `zram-swap`; the device comes up via `S15zram`:
+
+| Parameter | Default |
+|---|---|
+| Device size | `MemTotal/2048` = **≈61 MB** with 128 MB of RAM |
+| Algorithm | `lzo-rle` |
+| Priority | 100 |
+
+Configure it in `/etc/config/system`, section `system`:
+
+```sh
+uci set system.@system[0].zram_size_mb=32    # MB; RAM/2048 by default
+uci set system.@system[0].zram_comp_algo=lzo
+uci commit system && /etc/init.d/zram restart
+```
+
+Check with `swapon -s` or `/etc/init.d/zram status`. This needs `CONFIG_SWAP` in
+the kernel, which the rtl819x target disables by default (`SMALL_FLASH`).
+
+**The Footstrap LuCI theme is not part of the image**: the rootfs partition is
+3.73 MB and by v0.2 it is 98% full (~55 KB free), while the theme adds ~209 KB to
+the squashfs. It is built together with the image and shipped in the release as
+separate packages:
+
+- `luci-theme-footstrap-*.apk` (~98 KB);
+- `luci-i18n-footstrap-ru-*.apk` — Russian translation of the theme.
+
+Installing on the device (the overlay is 10 MB, the unpacked theme takes ~340 KB):
+
+```sh
+cd /tmp
+wget -O footstrap.apk    https://github.com/rastral-null/openwrt-ts7022/releases/download/0.3/luci-theme-footstrap-<version>.apk
+wget -O footstrap-ru.apk https://github.com/rastral-null/openwrt-ts7022/releases/download/0.3/luci-i18n-footstrap-ru-<version>.apk
+apk add --allow-untrusted --force-non-repository footstrap.apk footstrap-ru.apk
+```
+
+`--force-non-repository` is required because apk 3 refuses a package that is not
+in any configured repository: `You tried to add a non-repository package to
+system`.
+
+The theme registers itself (uci-defaults) and becomes active right away; switch
+back to Bootstrap in "System → Language and Style". After a sysupgrade the theme
+has to be installed again: packages living in the overlay are not carried over,
+only settings are.
 
 ### Upgrade
 

@@ -91,6 +91,8 @@ This is an engineering provenance review, not legal advice.
 | LuCI: настройки Wi-Fi для rtl8192cd | `feeds-patches/luci-mod-network/` | Apache-2.0 (как LuCI) |
 | netifd: исправление цикла чтения обработчиков | `openwrt-upstream.patch` | GPL-2.0 (как netifd); отправлено в OpenWrt: PR #25851 |
 | `feeds-patches/` для пакетов из фидов | `openwrt-upstream.patch` (include/package.mk) | GPL-2.0-only |
+| ZRAM-swap (сжатый swap в ОЗУ) | `package/system/zram-swap` (OpenWrt), `package/kernel/linux/modules/other.mk` (kmod-zram) | GPL-2.0-only |
+| Тема LuCI Footstrap — в образе **не** стоит, собирается из фида и кладётся в релиз отдельным пакетом | фид LuCI, `themes/luci-theme-footstrap` (Ivan Kvashonkin) | Apache-2.0 |
 
 ## Доноры, которые изучались / Reference projects
 
