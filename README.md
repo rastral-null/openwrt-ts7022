@@ -653,15 +653,15 @@ uci commit system && /etc/init.d/zram restart
 занят на 98% (свободно ~55 КБ), а тема добавляет ~209 КБ в squashfs. Она
 собирается вместе с образом и лежит в релизе отдельными пакетами:
 
-- `luci-theme-footstrap-*.apk` (~98 КБ);
-- `luci-i18n-footstrap-ru-*.apk` — русская локализация темы.
+- `luci-theme-footstrap-v0.3.apk` (~98 КБ);
+- `luci-i18n-footstrap-ru-v0.3.apk` — русская локализация темы.
 
 Установка на устройство (overlay 10 МБ, распакованная тема занимает ~340 КБ):
 
 ```sh
 cd /tmp
-wget -O footstrap.apk    https://github.com/rastral-null/openwrt-ts7022/releases/download/0.3/luci-theme-footstrap-<версия>.apk
-wget -O footstrap-ru.apk https://github.com/rastral-null/openwrt-ts7022/releases/download/0.3/luci-i18n-footstrap-ru-<версия>.apk
+wget -O footstrap.apk    https://github.com/rastral-null/openwrt-ts7022/releases/download/0.3/luci-theme-footstrap-v0.3.apk
+wget -O footstrap-ru.apk https://github.com/rastral-null/openwrt-ts7022/releases/download/0.3/luci-i18n-footstrap-ru-v0.3.apk
 apk add --allow-untrusted --force-non-repository footstrap.apk footstrap-ru.apk
 ```
 
@@ -1369,15 +1369,15 @@ the kernel, which the rtl819x target disables by default (`SMALL_FLASH`).
 the squashfs. It is built together with the image and shipped in the release as
 separate packages:
 
-- `luci-theme-footstrap-*.apk` (~98 KB);
-- `luci-i18n-footstrap-ru-*.apk` — Russian translation of the theme.
+- `luci-theme-footstrap-v0.3.apk` (~98 KB);
+- `luci-i18n-footstrap-ru-v0.3.apk` — Russian translation of the theme.
 
 Installing on the device (the overlay is 10 MB, the unpacked theme takes ~340 KB):
 
 ```sh
 cd /tmp
-wget -O footstrap.apk    https://github.com/rastral-null/openwrt-ts7022/releases/download/0.3/luci-theme-footstrap-<version>.apk
-wget -O footstrap-ru.apk https://github.com/rastral-null/openwrt-ts7022/releases/download/0.3/luci-i18n-footstrap-ru-<version>.apk
+wget -O footstrap.apk    https://github.com/rastral-null/openwrt-ts7022/releases/download/0.3/luci-theme-footstrap-v0.3.apk
+wget -O footstrap-ru.apk https://github.com/rastral-null/openwrt-ts7022/releases/download/0.3/luci-i18n-footstrap-ru-v0.3.apk
 apk add --allow-untrusted --force-non-repository footstrap.apk footstrap-ru.apk
 ```
 
