@@ -4,7 +4,7 @@
 
 <img width="1478" height="973" alt="image" src="https://github.com/user-attachments/assets/f8eb9cf5-34e7-4d91-8030-6ccf4549edec" />
 
-RU:
+# RU:
 
 ### Характеристики
 
@@ -664,6 +664,6 @@ sysupgrade -v /tmp/…-squashfs-sysupgrade.bin
 
 На репозиторий действует лицензия GPL v2.0
 
-ENG:
+# ENG:
 <img width="1724" height="976" alt="image" src="https://github.com/user-attachments/assets/897fed1f-8c36-493b-8933-bb3c5d8deee8" />
-# LuCI web interface running on TRANSERV TS-7022.
+*LuCI web interface running on TRANSERV TS-7022.*
