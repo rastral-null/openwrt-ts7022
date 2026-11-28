@@ -1,9 +1,10 @@
-# OpenWrt для Transerv 7022
+# OpenWRT for Transerv 7022
 
 <img width="500" height="474" alt="image" src="https://github.com/user-attachments/assets/b9a595e1-5ef5-4620-af26-ce6fa264cae6" />
 
 <img width="1478" height="973" alt="image" src="https://github.com/user-attachments/assets/f8eb9cf5-34e7-4d91-8030-6ccf4549edec" />
 
+RU:
 
 ### Характеристики
 
@@ -662,3 +663,6 @@ sysupgrade -v /tmp/…-squashfs-sysupgrade.bin
 ### Лицензия
 
 На репозиторий действует лицензия GPL v2.0
+
+ENG:
+<img width="500" height="474" alt="image" src="https://github.com/user-attachments/assets/b9a595e1-5ef5-4620-af26-ce6fa264cae6" />
