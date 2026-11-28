@@ -665,3 +665,5 @@ sysupgrade -v /tmp/…-squashfs-sysupgrade.bin
 На репозиторий действует лицензия GPL v2.0
 
 ENG:
+<img width="1724" height="976" alt="image" src="https://github.com/user-attachments/assets/897fed1f-8c36-493b-8933-bb3c5d8deee8" />
+# LuCI web interface running on TRANSERV TS-7022.
