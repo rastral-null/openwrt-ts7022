@@ -496,6 +496,18 @@ drv_rtl8192cd_setup() {
 	vap_count=0
 	for_each_interface "ap" rtl_count_ap
 	[ -d "/proc/$dev_ifname" ] && ifconfig "$dev_ifname" down 2>/dev/null
+	# Драйвер заводит все VAP (wlanX-va0..va3) при загрузке модуля и никогда их не
+	# удаляет. Убранную из конфигурации сеть netifd больше не поднимает, но netdev
+	# остаётся UP и в мосту - точка продолжает вещать старым SSID до перезагрузки
+	# (проверено 28.11.2026: удалил вторую сеть через uci + wifi reload, va0 остался
+	# в br-lan с прежним SSID). Гасим VAP, которых нет в конфигурации: корень - это
+	# индекс 0, va0 - 1, va1 - 2, va2 - 3, и они всегда идут подряд.
+	vap_idx=$((vap_count > 0 ? vap_count - 1 : 0))
+	while [ "$vap_idx" -le 3 ]; do
+		[ -d "/proc/$dev_ifname-va$vap_idx" ] &&
+			ifconfig "$dev_ifname-va$vap_idx" down 2>/dev/null
+		vap_idx=$((vap_idx + 1))
+	done
 	rtl_apply_mib "$dev_ifname" "vap_enable=$([ "$vap_count" -gt 1 ] && echo 1 || echo 0)" || {
 		wireless_setup_failed MIB_WRITE_FAILED
 		return 1

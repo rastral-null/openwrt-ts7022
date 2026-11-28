@@ -1,0 +1,13 @@
+{
+	"admin/status/ts7022": {
+		"title": "Thermals",
+		"order": 30,
+		"action": {
+			"type": "view",
+			"path": "status/ts7022"
+		},
+		"depends": {
+			"acl": [ "luci-app-ts7022" ]
+		}
+	}
+}

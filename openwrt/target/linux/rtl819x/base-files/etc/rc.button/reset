@@ -1,0 +1,83 @@
+#!/bin/sh
+# Reset button handler.
+#
+# Default OpenWrt reboots on a short press. On the TS-7022 the button sits on
+# the front panel next to the LEDs, so a short press toggles both radios
+# instead - that is the one thing people reach for most often:
+#
+#   short press (<1 s)   both radios off / back on
+#   1 s .. 4 s           reboot
+#   5 s and longer       factory reset (erases the overlay, then reboots)
+#
+# Holding the button past 5 s also puts the LEDs into the failsafe state, as
+# in stock OpenWrt. Other boards on this target keep the stock behaviour.
+
+. /lib/functions.sh
+
+OVERLAY="$( grep ' /overlay ' /proc/mounts )"
+
+wifi_is_up() {
+	ubus call network.wireless status 2>/dev/null | grep -q '"up": true'
+}
+
+wifi_toggle() {
+	if wifi_is_up; then
+		wifi down
+	else
+		wifi up
+	fi
+}
+
+case "$(cat /tmp/sysinfo/board_name 2>/dev/null)" in
+transerv,ts7022)
+	case "$ACTION" in
+	pressed)
+		[ -z "$OVERLAY" ] && return 0
+
+		return 5
+		;;
+	timeout)
+		. /etc/diag.sh
+		set_state failsafe
+		;;
+	released)
+		if [ "$SEEN" -lt 1 ]; then
+			echo "WIFI TOGGLE" > /dev/console
+			wifi_toggle &
+		elif [ "$SEEN" -lt 5 ]; then
+			echo "REBOOT" > /dev/console
+			sync
+			reboot
+		elif [ -n "$OVERLAY" ]; then
+			echo "FACTORY RESET" > /dev/console
+			factoryreset -y && reboot &
+		fi
+		;;
+	esac
+	;;
+*)
+	case "$ACTION" in
+	pressed)
+		[ -z "$OVERLAY" ] && return 0
+
+		return 5
+		;;
+	timeout)
+		. /etc/diag.sh
+		set_state failsafe
+		;;
+	released)
+		if [ "$SEEN" -lt 1 ]; then
+			echo "REBOOT" > /dev/console
+			sync
+			reboot
+		elif [ "$SEEN" -ge 5 -a -n "$OVERLAY" ]; then
+			echo "FACTORY RESET" > /dev/console
+			factoryreset -y && reboot &
+		fi
+		;;
+	esac
+	;;
+esac
+
+return 0

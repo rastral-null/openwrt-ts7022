@@ -1,0 +1,11 @@
+{
+	"luci-app-ts7022": {
+		"description": "Grant read access to the TS-7022 thermal sensors",
+		"read": {
+			"file": {
+				"/proc/wlan0/mib_rf": [ "read" ],
+				"/proc/wlan1/mib_rf": [ "read" ]
+			}
+		}
+	}
+}

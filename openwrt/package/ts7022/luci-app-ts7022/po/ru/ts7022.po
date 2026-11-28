@@ -1,0 +1,32 @@
+msgid ""
+msgstr "Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Thermals"
+msgstr "Температуры"
+
+msgid "Sensor"
+msgstr "Датчик"
+
+msgid "Temperature"
+msgstr "Температура"
+
+msgid "SoC (RTL8197F)"
+msgstr "SoC (RTL8197F)"
+
+msgid "2.4 GHz PA, path A"
+msgstr "2,4 ГГц PA, тракт A"
+
+msgid "2.4 GHz PA, path B"
+msgstr "2,4 ГГц PA, тракт B"
+
+msgid "5 GHz PA, path A"
+msgstr "5 ГГц PA, тракт A"
+
+msgid "5 GHz PA, path B"
+msgstr "5 ГГц PA, тракт B"
+
+msgid "n/a"
+msgstr "нет данных"
+
+msgid "Values are read from the Wi-Fi driver thermal sensors in /proc/wlanN/mib_rf and refresh every 5 seconds. The SoC sensor is only exposed by the 5 GHz radio."
+msgstr "Значения читаются из датчиков драйвера Wi-Fi в /proc/wlanN/mib_rf и обновляются каждые 5 секунд. Датчик SoC отдаёт только радио 5 ГГц."

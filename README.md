@@ -677,6 +677,80 @@ Bootstrap можно в «Система → Язык и оформление».
 поставить заново: пакеты из overlay при обновлении не переносятся, переезжают
 только настройки.
 
+### v1.0: температуры, кнопки и роуминг
+
+**Фиды пакетов.** В `include/feeds.mk` убрана строка, добавлявшая в
+`/etc/apk/repositories.d/distfeeds.list` несуществующий фид
+`targets/<target>/packages` — именно она давала 404 в LuCI. Кроме того, в
+конфиге включены `CONFIG_FEED_luci` и `CONFIG_FEED_packages`, поэтому `apk`
+теперь видит `base`, `luci` и `packages`. Ядровые модули (`kmod-*`) по-прежнему
+ставятся только сборкой: в бинарных фидах для этой цели их нет.
+
+**Status → Температуры.** Собственный пакет `luci-app-ts7022` (дерево
+`openwrt/package/ts7022/`) добавляет страницу с датчиками драйвера:
+
+| Датчик | Источник |
+|---|---|
+| SoC (RTL8197F) | `cputemperature` из `/proc/wlan1/mib_rf` |
+| 2,4 ГГц PA, тракт A/B | `current thermal path A/B` из `/proc/wlan0/mib_rf` |
+| 5 ГГц PA, тракт A/B | `current thermal path A/B` из `/proc/wlan1/mib_rf` |
+
+`/proc/wlanN/thermal` всегда 0 и не используется. Страница только читает,
+обновляется раз в 5 секунд; доступ описан в
+`root/usr/share/rpcd/acl.d/luci-app-ts7022.json`.
+
+**MAC-адреса.** `eth0`/`br-lan` берут MAC из hwconfig по `0x20007`, `wlan0` —
+по `0x20013`, `wlan1` — по `0x209d6` (в DTS это `nvmem-cells` + `mac-base`).
+Адрес `00:e0:4c:81:86:86` — заглушка драйвера для VAP, которые не подняты; у
+настроенной второй сети MAC производный (`f4:e5:78:66:61:0f` →
+`f6:e5:78:66:71:0f`), его считает `rtl_derived_mac` в `rtl8192cd.sh`.
+
+**Калибровки Wi-Fi.** Нули в `pwrlevel*`/`pwrlevel_TSSI*` из
+`/proc/wlanN/mib_rf` — это нормально: поля принадлежат legacy-MIB от 8192cd, а
+RTL8812FE — HAL-чип, у которого мощностные таблицы (per-rate PG и LMT) грузятся
+из hwconfig (`0x20a9e`, `0x20b62`, `0x20ee2`, `0x20fa6`, по 142 байта) через
+HAL-интерфейс. `disable_txpwrlmt: 1` отключает применение регуляторных пределов
+LMT, поэтому мощность берётся из заводской PG-таблицы; `tgpwr_HT1S_NEW: 76` —
+целевые 19 дБм для HT 1SS, `regdomain: 12` — RU.
+
+**Светодиоды.** 2,4 ГГц — GPIO 33 (вывод E1) через `gpio-leds`, триггер
+`netdev` на `wlan0` (`link tx rx`). 5 ГГц — не на GPIO SoC: линия 100 из
+стоковой таблицы лежит вне двух банков (0..63), лампа висит на LED-выводе
+RTL8812FE, и драйвер мигает ею по трафику сам (`led_type=7`,
+`LEDTYPE_SW_ENABLETXRXDATA`); вручную — `echo 0|1|2 > /proc/wlan1/led`
+(погасить / зажечь / вернуть). WPS — GPIO 57, в простое погашен.
+Internet-лампа аппаратная, её ведёт свитч, программно она не управляется.
+
+**Кнопки.** `/etc/rc.button/reset` для TS-7022: короткое нажатие (меньше
+секунды) — выключить/включить оба радио; 1–4 с — перезагрузка; 5 с и дольше —
+сброс к заводским (стирает overlay и перезагружается). Кнопка WPS остаётся за
+штатным обработчиком `wifi-scripts`, но в этом образе ей нечего запускать: WPS
+недоступен — драйвер реализует только радио-часть WSC, а сам обмен выполняет
+закрытый демон Realtek `wscd`, которого в OpenWrt нет.
+
+**Роуминг.** `/usr/sbin/ts7022-roaming` настраивает точку под общий SSID:
+
+```sh
+# первая точка
+ts7022-roaming -s Home -k 'secret123' -c 1  -C 36
+# вторая точка
+ts7022-roaming -s Home -k 'secret123' -c 11 -C 44
+```
+
+Одинаковые SSID, ключ, WPA2-CCMP и 802.11w, разные каналы. Честные
+ограничения: 802.11r/k/v в драйвер не собраны (`CONFIG_RTL_11R_SUPPORT` и
+соседние выключены), FT нет — переход между точками это полное рукопожатие
+WPA2 (обычно 100–500 мс); «band steering» здесь означает лишь одинаковый SSID
+на обоих диапазонах, выбор остаётся за клиентом; WDS-бэкхол наш netifd-драйвер
+не поддерживает, вторая точка подключается кабелем в LAN-порт.
+
+**Удалённые сети.** Раньше после удаления второй Wi-Fi сети её VAP
+(`wlanX-vaN`) оставался поднятым в мосту и продолжал вещать старым SSID до
+перезагрузки: netifd не трогает VAP, которых нет в конфиге. Теперь
+`rtl8192cd.sh` при переинициализации гасит все VAP сверх настроенных. Заодно о
+командах: `wifi reload` в этой сборке лишь перезапускает сеть, а конфиг радио
+применяет `wifi reconf` или `wifi`.
+
 ### Обновление
 
 С v0.2 обновление идёт обычным путём: LuCI → «Обновление прошивки» или
@@ -1393,6 +1467,81 @@ The theme registers itself (uci-defaults) and becomes active right away; switch
 back to Bootstrap in "System → Language and Style". After a sysupgrade the theme
 has to be installed again: packages living in the overlay are not carried over,
 only settings are.
+
+### v1.0: thermals, buttons and roaming
+
+**Package feeds.** The line in `include/feeds.mk` that added the non-existent
+`targets/<target>/packages` feed to
+`/etc/apk/repositories.d/distfeeds.list` is gone — that was the 404 in LuCI.
+`CONFIG_FEED_luci` and `CONFIG_FEED_packages` are enabled as well, so `apk` now
+sees `base`, `luci` and `packages`. Kernel modules (`kmod-*`) still come from a
+build only: the binary feeds do not carry them for this target.
+
+**Status → Thermals.** The in-tree package `luci-app-ts7022`
+(`openwrt/package/ts7022/`) adds a page with the driver sensors:
+
+| Sensor | Source |
+|---|---|
+| SoC (RTL8197F) | `cputemperature` from `/proc/wlan1/mib_rf` |
+| 2.4 GHz PA, path A/B | `current thermal path A/B` from `/proc/wlan0/mib_rf` |
+| 5 GHz PA, path A/B | `current thermal path A/B` from `/proc/wlan1/mib_rf` |
+
+`/proc/wlanN/thermal` is always 0 and is not used. The page is read-only and
+refreshes every 5 seconds; access is declared in
+`root/usr/share/rpcd/acl.d/luci-app-ts7022.json`.
+
+**MAC addresses.** `eth0`/`br-lan` take the MAC from hwconfig at `0x20007`,
+`wlan0` at `0x20013`, `wlan1` at `0x209d6` (`nvmem-cells` + `mac-base` in the
+DTS). `00:e0:4c:81:86:86` is the driver placeholder for VAPs that are not up; a
+configured second network gets a derived MAC (`f4:e5:78:66:61:0f` →
+`f6:e5:78:66:71:0f`), computed by `rtl_derived_mac` in `rtl8192cd.sh`.
+
+**Wi-Fi calibration.** Zeros in `pwrlevel*`/`pwrlevel_TSSI*` from
+`/proc/wlanN/mib_rf` are expected: those are legacy 8192cd MIB fields, while the
+RTL8812FE is a HAL chip whose power tables (per-rate PG and LMT) are loaded from
+hwconfig (`0x20a9e`, `0x20b62`, `0x20ee2`, `0x20fa6`, 142 bytes each) through
+the HAL interface. `disable_txpwrlmt: 1` skips the regulatory LMT clamping, so
+the power comes from the factory PG table; `tgpwr_HT1S_NEW: 76` is the 19 dBm
+target for HT 1SS, `regdomain: 12` is RU.
+
+**LEDs.** 2.4 GHz is GPIO 33 (pin E1) through `gpio-leds` with a `netdev`
+trigger on `wlan0` (`link tx rx`). 5 GHz is not on a SoC GPIO: line 100 from the
+stock table lies outside both banks (0..63), the lamp sits on the RTL8812FE LED
+output and the driver blinks it on traffic itself (`led_type=7`,
+`LEDTYPE_SW_ENABLETXRXDATA`); manually: `echo 0|1|2 > /proc/wlan1/led` (off /
+on / restore). WPS is GPIO 57, off when idle. The Internet LED is wired to the
+switch and is not software-controllable.
+
+**Buttons.** `/etc/rc.button/reset` on the TS-7022: a short press (under a
+second) turns both radios off or back on; 1–4 s reboots; 5 s and longer performs
+a factory reset (erases the overlay and reboots). The WPS button keeps the
+stock `wifi-scripts` handler, but there is nothing for it to start here: WPS is
+unavailable in this image — the driver only implements the radio side of WSC,
+the exchange itself is done by Realtek's closed-source `wscd`, which OpenWrt
+does not have.
+
+**Roaming.** `/usr/sbin/ts7022-roaming` prepares an AP for a shared SSID:
+
+```sh
+# first AP
+ts7022-roaming -s Home -k 'secret123' -c 1  -C 36
+# second AP
+ts7022-roaming -s Home -k 'secret123' -c 11 -C 44
+```
+
+Same SSID, key, WPA2-CCMP and 802.11w, different channels. Honest limits:
+802.11r/k/v are not compiled in (`CONFIG_RTL_11R_SUPPORT` and neighbours are
+off), there is no FT, so moving between APs is a full WPA2 handshake (usually
+100–500 ms); "band steering" here only means the same SSID on both bands, the
+client decides; WDS backhaul is not supported by this netifd driver, so the
+second AP must be wired to a LAN port.
+
+**Removed networks.** Previously, after deleting a second Wi-Fi network its VAP
+(`wlanX-vaN`) stayed up in the bridge and kept beaconing the old SSID until a
+reboot, because netifd does not touch VAPs missing from the config. Now
+`rtl8192cd.sh` brings down every VAP beyond the configured ones during
+re-initialisation. A note on commands: in this build `wifi reload` only
+restarts the network, while radio config is applied by `wifi reconf` or `wifi`.
 
 ### Upgrade
 

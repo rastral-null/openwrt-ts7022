@@ -1,0 +1,122 @@
+#!/bin/sh
+# Configure this TS-7022 as one of two access points that share one SSID, so
+# clients can move between them on their own. Run it on every AP with the
+# same SSID and key, but with different channels.
+#
+#   AP1:  ts7022-roaming -s Home -k 'secret123' -c 1  -C 36
+#   AP2:  ts7022-roaming -s Home -k 'secret123' -c 11 -C 44
+#
+# What it sets on both radios: the same SSID, WPA2-PSK (CCMP), the same key,
+# 802.11w optional (PMF), country RU, 2.4 GHz HT20 and 5 GHz VHT80. Channels
+# are only changed when -c / -C are given.
+#
+# Honest limits of this hardware/driver (checked against the kernel tree):
+#
+#   * 802.11r (fast BSS transition) is not compiled in - there is no FT, so
+#     every move between APs is a full WPA2 handshake (typically 100-500 ms).
+#     802.11k and 802.11v are absent as well, so clients get no neighbour
+#     reports and no BSS transition requests: roaming is entirely up to the
+#     client. Same SSID on both bands is what people call "band steering"
+#     here - the client picks the band, the AP cannot push it.
+#   * WDS/4-address backhaul is not supported by this netifd driver, so the
+#     second AP must be wired to the first one with an Ethernet cable (or be
+#     connected to the same switch). Put the cable into a LAN port.
+#
+# Run it as root over ssh. The radios restart, so Wi-Fi drops for a few
+# seconds.
+
+SSID=
+KEY=
+CH24=
+CH5=
+PMF=1
+
+usage() {
+	cat >&2 <<'EOF'
+Usage: ts7022-roaming -s SSID -k KEY [-c CH24] [-C CH5] [-w 0|1|2]
+
+  -s SSID   network name, identical on both APs
+  -k KEY    WPA2 passphrase (8..63 characters), identical on both APs
+  -c CH     2.4 GHz channel, e.g. 1, 6 or 11
+  -C CH     5 GHz channel, e.g. 36, 44, 100
+  -w N      802.11w: 0 off, 1 optional (default), 2 required
+EOF
+	exit 1
+}
+
+while getopts "s:k:c:C:w:h" opt; do
+	case "$opt" in
+	s) SSID="$OPTARG" ;;
+	k) KEY="$OPTARG" ;;
+	c) CH24="$OPTARG" ;;
+	C) CH5="$OPTARG" ;;
+	w) PMF="$OPTARG" ;;
+	*) usage ;;
+	esac
+done
+
+[ -n "$SSID" ] || usage
+[ -n "$KEY" ] || usage
+
+case "$SSID" in
+*[![:print:]]*) echo "SSID must be printable ASCII" >&2; exit 1 ;;
+esac
+
+if [ "${#SSID}" -lt 1 ] || [ "${#SSID}" -gt 32 ]; then
+	echo "SSID must be 1..32 characters" >&2
+	exit 1
+fi
+
+if [ "${#KEY}" -lt 8 ] || [ "${#KEY}" -gt 63 ]; then
+	echo "key must be 8..63 characters" >&2
+	exit 1
+fi
+
+case "$PMF" in
+0|1|2) ;;
+*) echo "802.11w must be 0, 1 or 2" >&2; exit 1 ;;
+esac
+
+[ -f /etc/config/wireless ] || { echo "/etc/config/wireless not found" >&2; exit 1; }
+
+# One wifi-iface per radio, both with the same credentials.
+set_iface() {
+	local section="$1" dev="$2"
+
+	uci -q get "wireless.$section" >/dev/null || uci set "wireless.$section=wifi-iface"
+	uci set "wireless.$section.device=$dev"
+	uci set "wireless.$section.mode=ap"
+	uci set "wireless.$section.network=lan"
+	uci set "wireless.$section.ssid=$SSID"
+	uci set "wireless.$section.encryption=psk2+ccmp"
+	uci set "wireless.$section.key=$KEY"
+	uci set "wireless.$section.ieee80211w=$PMF"
+	uci -q delete "wireless.$section.disabled"
+}
+
+set_iface default_radio0 radio0
+set_iface default_radio1 radio1
+
+uci set wireless.radio0.disabled=0
+uci set wireless.radio1.disabled=0
+uci set wireless.radio0.country=RU
+uci set wireless.radio1.country=RU
+uci set wireless.radio0.htmode=HT20
+uci set wireless.radio1.htmode=VHT80
+
+[ -n "$CH24" ] && uci set wireless.radio0.channel="$CH24"
+[ -n "$CH5" ] && uci set wireless.radio1.channel="$CH5"
+
+uci commit wireless || { echo "uci commit failed" >&2; exit 1; }
+
+wifi
+
+cat <<EOF
+SSID      : $SSID
+2.4 GHz   : channel $(uci -q get wireless.radio0.channel || echo auto), HT20
+5 GHz     : channel $(uci -q get wireless.radio1.channel || echo auto), VHT80
+802.11w   : $PMF
+
+Run the same command on the second AP with different channels.
+No 802.11r/k/v here: clients roam on their own, expect a full handshake.
+EOF
