@@ -665,4 +665,3 @@ sysupgrade -v /tmp/…-squashfs-sysupgrade.bin
 На репозиторий действует лицензия GPL v2.0
 
 ENG:
-<img width="500" height="474" alt="image" src="https://github.com/user-attachments/assets/b9a595e1-5ef5-4620-af26-ce6fa264cae6" />
