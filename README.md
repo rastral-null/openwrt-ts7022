@@ -645,7 +645,8 @@ uci set system.@system[0].zram_comp_algo=lzo
 uci commit system && /etc/init.d/zram restart
 ```
 
-Проверка: `swapon -s` или `/etc/init.d/zram status`. В ядре для этого включён
+Проверка: `cat /proc/swaps` или `/etc/init.d/zram status` (у busybox `swapon`
+нет ключа `-s`, `zramctl` в образе тоже нет). В ядре для этого включён
 `CONFIG_SWAP` — у цели rtl819x он по умолчанию выключен (`SMALL_FLASH`).
 
 **Тема LuCI Footstrap** в образ **не входит**: раздел rootfs — 3,73 МБ, к v0.2 он
@@ -666,7 +667,9 @@ apk add --allow-untrusted --force-non-repository footstrap.apk footstrap-ru.apk
 
 `--force-non-repository` нужен потому, что apk 3 отказывается ставить пакет,
 которого нет ни в одном настроенном репозитории: `You tried to add a
-non-repository package to system`.
+non-repository package to system`. Предупреждения `wget: ... Operation not
+permitted` / `updating ... packages.adb` при этом безобидны — apk просто не смог
+обновить индексы, установка из локального файла всё равно проходит.
 
 Тема регистрируется сама (uci-defaults) и сразу становится активной; вернуться на
 Bootstrap можно в «Система → Язык и оформление». После sysupgrade тему нужно
@@ -1357,7 +1360,8 @@ uci set system.@system[0].zram_comp_algo=lzo
 uci commit system && /etc/init.d/zram restart
 ```
 
-Check with `swapon -s` or `/etc/init.d/zram status`. This needs `CONFIG_SWAP` in
+Check with `cat /proc/swaps` or `/etc/init.d/zram status` (busybox `swapon` has
+no `-s` option, and there is no `zramctl` in the image). This needs `CONFIG_SWAP` in
 the kernel, which the rtl819x target disables by default (`SMALL_FLASH`).
 
 **The Footstrap LuCI theme is not part of the image**: the rootfs partition is
@@ -1379,7 +1383,9 @@ apk add --allow-untrusted --force-non-repository footstrap.apk footstrap-ru.apk
 
 `--force-non-repository` is required because apk 3 refuses a package that is not
 in any configured repository: `You tried to add a non-repository package to
-system`.
+system`. The `wget: ... Operation not permitted` / `updating ... packages.adb`
+warnings are harmless — apk simply could not refresh its indexes, and the install
+from the local file still succeeds.
 
 The theme registers itself (uci-defaults) and becomes active right away; switch
 back to Bootstrap in "System → Language and Style". After a sysupgrade the theme
